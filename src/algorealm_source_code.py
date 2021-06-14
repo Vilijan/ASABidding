@@ -153,9 +153,9 @@ def algorealm_app():
 
     algorealm_actions_logic = algrealm_claim_title_atomic_transfer_logic(claim_title_code=titles_claim_logic)
 
-    application_calls_code = algorealm_application_calls(
-        algorealm_law_promulgation_code=algorealm_law_promulgation_logic(),
-        claim_titles_code=algorealm_actions_logic)
+    application_calls_code = \
+        algorealm_application_calls(algorealm_law_promulgation_code=algorealm_law_promulgation_logic(),
+                                    claim_titles_code=algorealm_actions_logic)
 
     approval_program = application_start(algorealm_creation_code=algorealm_creation_logic(),
                                          algorealm_actions_code=application_calls_code)
