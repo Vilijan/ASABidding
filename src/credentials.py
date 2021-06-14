@@ -1,5 +1,4 @@
 from algosdk.v2client import algod
-from algosdk import mnemonic
 import yaml
 import os
 from pathlib import Path
