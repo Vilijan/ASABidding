@@ -21,7 +21,7 @@ def transferring_titles_stateless_contract_logic(app_id: int,
     # 2
     is_money_sending_call = Gtxn[1].type_enum() == TxnType.Payment
     is_the_same_sender = Gtxn[0].sender() == Gtxn[1].sender()
-    is_the_pool_reciever = Gtxn[1].receiver() == Addr(address=donation_receiver)
+    is_correct_receiver = Gtxn[1].receiver() == Addr(address=donation_receiver)
 
     # 3
     is_transaction_transfer_call = Gtxn[2].type_enum() == TxnType.AssetTransfer
@@ -42,7 +42,7 @@ def transferring_titles_stateless_contract_logic(app_id: int,
                is_calling_algorealm_app,
                is_money_sending_call,
                is_the_same_sender,
-               is_the_pool_reciever,
+               is_correct_receiver,
                is_transaction_transfer_call,
                is_the_valid_receiver,
                is_valid_asset_transfer,
@@ -50,3 +50,6 @@ def transferring_titles_stateless_contract_logic(app_id: int,
                is_acceptable_fee,
                is_valid_close_to_address,
                is_valid_rekey_to_address)
+
+
+

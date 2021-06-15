@@ -29,7 +29,6 @@ def get_client():
 
 def main_developer_credentials() -> (str, str):
     """
-
     :return:
         private_key: str
         public_key: str
@@ -38,5 +37,19 @@ def main_developer_credentials() -> (str, str):
 
     private_key = config.get('main_developer_credentials').get('private_key')
     public_key = config.get('main_developer_credentials').get('public_key')
+
+    return private_key, public_key
+
+
+def get_developer_credentials(developer_id: int) -> (str, str):
+    """
+        :return:
+            private_key: str
+            public_key: str
+        """
+    config = load_config()
+
+    private_key = config.get(f'developer_{developer_id}_credentials').get('private_key')
+    public_key = config.get(f'developer_{developer_id}_credentials').get('public_key')
 
     return private_key, public_key

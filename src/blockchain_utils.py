@@ -53,7 +53,7 @@ def create_application(client: algod.AlgodClient,
                        clear_program: bytes,
                        global_schema: algo_txn.StateSchema,
                        local_schema: algo_txn.StateSchema,
-                       app_args: List[Any]) -> Optional[int]:
+                       app_args: Optional[List[Any]]) -> Optional[int]:
     """
     :param client: algorand client
     :param creator_private_key: private key of the creator of the application
