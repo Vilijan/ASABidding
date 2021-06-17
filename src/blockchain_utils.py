@@ -136,7 +136,7 @@ def create_algorand_standard_asset(client: algod.AlgodClient,
                                    freeze_address: Optional[str] = None,
                                    clawback_address: Optional[str] = None,
                                    url: Optional[str] = None,
-                                   default_frozen: bool = False) -> Optional[str]:
+                                   default_frozen: bool = False) -> Optional[int]:
     """
 
     :param client: Algo client
@@ -197,7 +197,7 @@ def asa_opt_in(client: algod.AlgodClient,
     :param asa_id:
     :return:
     """
-    suggested_params = get_default_suggested_params()
+    suggested_params = get_default_suggested_params(client=client)
     sender_address = algo_acc.address_from_private_key(sender_private_key)
 
     txn = algo_txn.AssetTransferTxn(sender=sender_address,
@@ -212,6 +212,34 @@ def asa_opt_in(client: algod.AlgodClient,
     wait_for_confirmation(client=client, txid=txid)
 
     return txid
+
+
+def change_asa_management(client: algod.AlgodClient,
+                          current_manager_pk: str,
+                          asa_id: int,
+                          manager_address: Optional[str] = None,
+                          reserve_address: Optional[str] = None,
+                          freeze_address: Optional[str] = None,
+                          clawback_address: Optional[str] = None):
+    params = get_default_suggested_params(client=client)
+
+    current_manager_address = algo_acc.address_from_private_key(private_key=current_manager_pk)
+
+    txn = algo_txn.AssetConfigTxn(
+        sender=current_manager_address,
+        sp=params,
+        index=asa_id,
+        manager=manager_address,
+        reserve=reserve_address,
+        freeze=freeze_address,
+        clawback=clawback_address,
+        strict_empty_address_check=False)
+
+    # sign by the current manager - Account 2
+    stxn = txn.sign(current_manager_pk)
+    txid = client.send_transaction(stxn)
+
+    wait_for_confirmation(client=client, txid=txid)
 
 
 def execute_payment(client: algod.AlgodClient,

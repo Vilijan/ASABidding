@@ -1,7 +1,7 @@
 from pyteal import *
 
 
-def signing_authority_logic(app_id: int):
+def algo_delegate_authority_logic(app_id: int):
     """
     Signing authority for bidding app. Signs a group transactions and returns money to the owner.
     :param app_id:
