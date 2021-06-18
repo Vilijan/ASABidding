@@ -6,7 +6,7 @@ from pathlib import Path
 
 def load_config():
     path = Path(os.path.dirname(__file__))
-    config_location = os.path.join(path.parent, "config.yml")
+    config_location = os.path.join(path.parent.parent, "config.yml")
 
     with open(config_location) as file:
         return yaml.full_load(file)

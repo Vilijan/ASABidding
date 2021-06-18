@@ -4,9 +4,10 @@
 
 from pyteal import *
 
-from src.blockchain_utils import create_application, compile_program, execute_payment, change_asa_management, asa_opt_in
+from src.app_utils.blockchain_utils import create_application, compile_program, execute_payment, change_asa_management, \
+    asa_opt_in
 from algosdk.future import transaction as algo_txn
-from src.credentials import get_client, main_developer_credentials, get_developer_credentials
+from src.app_utils.credentials import get_client, main_developer_credentials, get_developer_credentials
 from algosdk.logic import address as algo_addr
 
 
@@ -173,6 +174,13 @@ def asa_transfer_logic():
     return If(are_valid_transactions, update_app_state, Seq([Return(Int(0))]))
 
 
+def approval_program():
+    return application_start(initialization_code=app_initialization_logic(),
+                             application_actions=
+                             setup_possible_app_calls_logic(assets_delegate_code=setup_asset_delegates_logic(),
+                                                            transfer_asa_logic=asa_transfer_logic()))
+
+
 def clear_program():
     return Return(Int(1))
 
@@ -214,7 +222,7 @@ print(f'app_id:{app_id}')
 
 # 2. Create ASA
 
-from src.blockchain_utils import create_algorand_standard_asset
+from src.app_utils.blockchain_utils import create_algorand_standard_asset
 
 asa_id = create_algorand_standard_asset(client=client,
                                         creator_private_key=main_dev_pk,
@@ -234,7 +242,7 @@ print(f'asa_id:{asa_id}')
 # asa_id = 16764594
 
 # 3. Setup ASA Delegate Smart Contract
-from src.asa_delegate_authority import asa_delegate_authority_logic
+from src.app_pyteal.asa_delegate_authority import asa_delegate_authority_logic
 
 asa_delegate_authority_logic_compiled = compileTeal(asa_delegate_authority_logic(app_id=app_id,
                                                                                  asa_id=asa_id),
@@ -265,7 +273,7 @@ change_asa_management(client=client,
                       clawback_address=asa_delegate_authority_address)
 
 # 6. Setup Algo Delegate Smart Contract
-from src.algo_delegate_authority import algo_delegate_authority_logic
+from src.app_pyteal.algo_delegate_authority import algo_delegate_authority_logic
 
 algo_delegate_authority_logic_compiled = compileTeal(algo_delegate_authority_logic(app_id=app_id),
                                                      mode=Mode.Signature,
@@ -287,7 +295,7 @@ execute_payment(client=client,
 # 8. Setting up the delegates authorities in the app
 
 from algosdk.encoding import decode_address
-from src.blockchain_utils import call_application, get_default_suggested_params, wait_for_confirmation
+from src.app_utils.blockchain_utils import call_application, get_default_suggested_params, wait_for_confirmation
 
 app_args = [
     decode_address(asa_delegate_authority_address),
@@ -374,4 +382,4 @@ txid = client.send_transactions(signed_group)
 
 print(txid)
 
-wait_for_confirmation(client, txid)
+
