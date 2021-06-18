@@ -27,8 +27,8 @@ print(f'app_id: {application_initialization_service.app_id} \n'
 
 bidder_pk, bidder_address = get_developer_credentials(developer_id=1)
 
-app_interaction_service = AppInteractionService(app_id=16868769,
-                                                asa_id=16868777,
+app_interaction_service = AppInteractionService(app_id=application_initialization_service.app_id,
+                                                asa_id=application_initialization_service.asa_id,
                                                 current_owner_address=main_dev_address)
 
 app_interaction_service.execute_bidding(bidder_name="wawa",
