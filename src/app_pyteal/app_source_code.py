@@ -43,7 +43,7 @@ def setup_possible_app_calls_logic(assets_delegate_code, transfer_asa_logic):
     """
     There are two possible options for executing the application actions:
     1. Setting up delegates
-        - App call with two arguments: ASADelegateAddress and AlgoDelegateAddress
+        - App call with 3 arguments: ASADelegateAddress, AlgoDelegateAddress and asaOwnerAddress.
     2. Transferring the ASA
         - Atomic transfer with 4 transactions:
             2.1 - Application call with arguments new_owner_name: str

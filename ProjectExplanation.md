@@ -8,6 +8,12 @@ Lets imagine a scenario in the today's world where an entity wants to sell some 
 
 We currently relay on a lot of signatures from well established institutions in order verify some processes. What if those signatures can be provided by compiling a deterministic program which is transparent and provides equal opportunity for everyone participating in the process ? 
 
+## Table of content
+
+[TOC]
+
+
+
 
 ## Application Usage
 
@@ -78,3 +84,193 @@ The code of the ASA bidding application is well structured and separated in 3 ma
    - *Credentials* - Handles the developer's credentials and provides us with a client through which we can interact with the network. I followed this [tutorial](https://developer.algorand.org/tutorials/creating-python-transaction-purestake-api/) in order to setup my client using the PureStake API.
    - *Blockchain* - Contains functions that encapsulate and execute basic blockchain transactions on the Algorand Network such as: Payments, AssetTransfer, ApplicationCalls and etc. Those transactions are well described in the [Algorand Developer Documentation](https://developer.algorand.org/docs/).
 
+## PyTeal Components
+
+In this section I will describe in more details the logic behind the PyTeal code that is used in this application. 
+
+### App Source Code
+
+The [app source module](https://github.com/Vilijan/ASABidding/blob/main/src/app_pyteal/app_source_code.py) contains all of the logic for the Stateful Smart Contract which represents the ASA bidding application. The application has 5 global variables shown in the code snippet below.
+```python
+class AppVariables:
+    titleOwner = "TitleOwner"
+    highestBid = "HighestBid"
+    asaOwnerAddress = "OwnerAddress"
+    asaDelegateAddress = "ASADelegateAddress"
+    algoDelegateAddress = "AlgoDelegateAddress"
+```
+
+- **Title Owner** - string variable that defines the name of the current ASA owner. During a bidding application call this name is provided as an argument to the application call by the bidder.
+- **Highest bid** - integer variable that represents the current highest bid that the owner of the ASA paid. 
+- **ASA Owner Address** - the owner of the address that contain the ASA. After a successful bidding application call this property is set to the sender of the bidder application call.
+- **ASA Delegate Address** - the address of the *ASA Delegate Authority* that is responsible for transferring the ASA. This variable can be set only once in the application.
+- **ALGO Delegate Address** - the address of the *ALGO Delegate Authority* that is responsible for refunding the ALGOs to the previous ASA owner. This variable can be set only once in the application.
+
+The application can be executed in three different flows, the first one is the application initialization which is executed when the transaction is created. The second and the third flows are actions that can be performed on the application such as: setting up delegate authorities and executing a bidding.
+
+```python
+def application_start(initialization_code,
+                      application_actions):
+    is_app_initialization = Txn.application_id() == Int(0)
+    are_actions_used = Txn.on_completion() == OnComplete.NoOp
+
+    return If(is_app_initialization, initialization_code,
+              If(are_actions_used, application_actions, Return(Int(0))))
+```
+
+1. **Application initialization** - from the image above we can see that this code will only run when the application's id is 0 which means that this is the first creation of the application. In this state we want to initialize the global variables of the application to which we know the default values.
+```python
+def app_initialization_logic():
+    return Seq([
+        App.globalPut(Bytes(AppVariables.titleOwner), Bytes(DefaultValues.titleOwner)),
+        App.globalPut(Bytes(AppVariables.highestBid), Int(DefaultValues.highestBid)),
+        Return(Int(1))
+    ])
+```
+2. **Possible application calls** - after we have initialized the application, now we can interact with it only through application calls. In the ASA bidding application we have two possible applications calls:
+```python
+def setup_possible_app_calls_logic(assets_delegate_code, transfer_asa_logic):
+    is_setting_up_delegates = Global.group_size() == Int(1)
+    is_transferring_asa = Global.group_size() == Int(4)
+
+    return If(is_setting_up_delegates, assets_delegate_code,
+              If(is_transferring_asa, transfer_asa_logic, Return(Int(0))))
+```
+
+- **Setting up delegates** - App call with 3 arguments: ASADelegateAddress, AlgoDelegateAddress and asaOwnerAddress. This application call should be allowed to be executed only once. 
+- **Transferring the ASA** - Atomic transfer with 4 transactions which represents a single bidding.
+  - Application call with arguments *new_owner_name: string*
+  - Payment to the *algoDelegateAddress* which represents the latest bid for the ASA.
+  - Payment from the algoDelegateAddress to the old owner of the ASA which refunds the ALGOs that were paid from the previous bidder
+  - Payment from the ASADelegateAddress that transfers the ASA from the old owner to the new one.
+
+3. **Setting up delegates** - In this part of the application we setup the delegate authorities as application variables and also we setup the first owner of the ASA which is the creator of the ASA. With this we are making sure that the transfer of the assets is always happening through the right authorities. The setting up of the delegates can be performed only once.
+```python
+def setup_asset_delegates_logic():
+    asa_delegate_authority = App.globalGetEx(Int(0), Bytes(AppVariables.asaDelegateAddress))
+    algo_delegate_authority = App.globalGetEx(Int(0), Bytes(AppVariables.algoDelegateAddress))
+
+    setup_failed = Seq([
+        Return(Int(0))
+    ])
+
+    setup_delegates = Seq([
+        App.globalPut(Bytes(AppVariables.asaDelegateAddress), Txn.application_args[0]),
+        App.globalPut(Bytes(AppVariables.algoDelegateAddress), Txn.application_args[1]),
+        App.globalPut(Bytes(AppVariables.asaOwnerAddress), Txn.application_args[2]),
+        Return(Int(1))
+    ])
+
+    return Seq([
+        asa_delegate_authority,
+        algo_delegate_authority,
+        If(Or(asa_delegate_authority.hasValue(), algo_delegate_authority.hasValue()), 
+           setup_failed, setup_delegates)
+    ])
+```
+
+​		Here we are creating optional variables for the *asaDelegateAddress* and the *algoDelegateAddress* values. If those variables  contain some value it means that they are already setup up which should result in a setup failure. If those variables does not contain any value means that we are setting them up for the first time.
+
+4. **Transferring the ASA** - This is the most complex PyTeal code that handles the bidding logic in the application. This code runs when atomic transfer with 4 transaction is executed. The transactions were described previously.
+```python
+def asa_transfer_logic():
+    # Valid first transaction
+    first_transaction_is_application_call = Gtxn[0].type_enum() == TxnType.ApplicationCall
+    first_transaction_has_one_argument = Gtxn[0].application_args.length() == Int(1)
+
+    valid_first_transaction = And(first_transaction_is_application_call,
+                                  first_transaction_has_one_argument)
+
+    # Valid second transaction
+    second_transaction_is_payment = Gtxn[1].type_enum() == TxnType.Payment
+    do_first_two_transaction_have_same_sender = Gtxn[1].sender() == Gtxn[0].sender()
+
+    current_highest_bid = App.globalGet(Bytes(AppVariables.highestBid))
+    is_valid_amount_to_change_titles = Gtxn[1].amount() > current_highest_bid
+
+    algo_delegate_address = App.globalGet(Bytes(AppVariables.algoDelegateAddress))
+    is_paid_to_algo_delegate_address = Gtxn[1].receiver() == algo_delegate_address
+
+    valid_second_transaction = And(second_transaction_is_payment,
+                                   do_first_two_transaction_have_same_sender,
+                                   is_valid_amount_to_change_titles,
+                                   is_paid_to_algo_delegate_address)
+
+    # Valid third transaction
+    old_owner_address = App.globalGet(Bytes(AppVariables.asaOwnerAddress))
+
+    third_transaction_is_payment = Gtxn[2].type_enum() == TxnType.Payment
+    is_paid_from_algo_delegate_authority = Gtxn[2].sender() == algo_delegate_address
+    is_paid_to_old_owner = Gtxn[2].receiver() == old_owner_address
+    is_paid_right_amount = Gtxn[2].amount() == current_highest_bid
+
+    valid_third_transaction = And(third_transaction_is_payment,
+                                  is_paid_from_algo_delegate_authority,
+                                  is_paid_to_old_owner,
+                                  is_paid_right_amount)
+
+    # Valid fourth transaction
+    asa_delegate_address = App.globalGet(Bytes(AppVariables.asaDelegateAddress))
+
+    fourth_transaction_is_asset_transfer = Gtxn[3].type_enum() == TxnType.AssetTransfer
+    is_paid_from_asa_delegate_authority = Gtxn[3].sender() == asa_delegate_address
+    is_the_new_owner_receiving_the_asa = Gtxn[3].asset_receiver() == Gtxn[1].sender()
+
+    valid_forth_transaction = And(fourth_transaction_is_asset_transfer,
+                                  is_paid_from_asa_delegate_authority,
+                                  is_the_new_owner_receiving_the_asa)
+
+    # Updating the app state
+    update_owner_name = App.globalPut(Bytes(AppVariables.titleOwner), Gtxn[0].application_args[0])
+    update_highest_bid = App.globalPut(Bytes(AppVariables.highestBid), Gtxn[1].amount())
+    update_owner_address = App.globalPut(Bytes(AppVariables.asaOwnerAddress), Gtxn[1].sender())
+    update_app_state = Seq([
+        update_owner_name,
+        update_highest_bid,
+        update_owner_address,
+        Return(Int(1))
+    ])
+
+    are_valid_transactions = And(valid_first_transaction,
+                                 valid_second_transaction,
+                                 valid_third_transaction,
+                                 valid_forth_transaction)
+
+    return If(are_valid_transactions, update_app_state, Seq([Return(Int(0))]))
+```
+
+The updating of the ASA ownership can be summarized in the following steps
+
+- **First transaction is valid**  - the first transaction which is the application call is valid when the transaction type is *ApplicationCall* and when we have passed only one argument which is the name of the bidder.
+- **Second transaction is valid** - the second transaction which is the payment to the *algoDelegateAddress* that represents the latest bid for the ASA is valid when:
+  - The transaction type is Payment
+  - The first and the second transaction have the same sender, this means that the caller of the application and the bidder are the same
+  - If the newly bided amount is bigger than the current highest one
+  - If the receiver of the payment i.e bid is the algoDelegateAddress
+- **Third transaction is valid** - the third transaction which is payment from the algoDelegateAddress to the old owner of the ASA which refunds the ALGOs that were paid from the previous bidder is valid when:
+  - The transaction type is Payment
+  - The sender of the transaction is the algoDelegateAddress which is responsible for refunding
+  - The receiver of the transaction is the current address that is held in the asaOwnerAddress variable.
+  - The payment amount is equal to the current highest bid that is held in the highestBid variable.
+- Fourth transaction is valid - the fourth transaction which is payment from the ASADelegateAddress that transfers the ASA from the old owner to the new one is valid when:
+  - The transaction type is AssetTransfer
+  - The transaction sender is the ASADelegateAddress  which is responsible for transferring the ASA
+  - The transaction receiver is the new owner address which is the sender of the first two transactions.
+
+When all of the 4 transactions are valid we update the state of the application and thus the approval program returns that the atomic transfer is valid. If any of those cases fails the approval program will reject the atomic transfer transaction.
+
+In the end we combine everything to get the approval and the clear programs.
+
+```python
+def approval_program():
+    return application_start(initialization_code=app_initialization_logic(),
+                             application_actions=
+                             setup_possible_app_calls_logic(assets_delegate_code=setup_asset_delegates_logic(),
+                                                            transfer_asa_logic=asa_transfer_logic()))
+
+
+def clear_program():
+    return Return(Int(1))
+```
+
+### ASA Delegate authority
