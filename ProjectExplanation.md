@@ -9,7 +9,7 @@ Lets imagine a scenario in the today's world where an entity wants to sell some 
 We currently relay on a lot of signatures from well established institutions in order verify some processes. What if those signatures can be provided by compiling a deterministic program which is transparent and provides equal opportunity for everyone participating in the process ? 
 
 
-## Application 
+## Application Usage
 
 The decentralized application described in this solution has a goal to do automated bidding for a predefined Algorand Standard Asset (ASA). The usage process of the application is the following:
 
@@ -62,3 +62,19 @@ app_interaction_service.execute_bidding(bidder_name="Alice",
                                         bidder_address=main_dev_address,
                                         amount=4000)
 ```
+
+## Application architecture
+
+The code of the ASA bidding application is well structured and separated in 3 main components:
+
+1. **PyTeal** - this component contains all of the PyTeal code that is used in the application. The PyTeal code is later on divided into additional 3 sub-components:
+   - *App Source Code* - This module defines all of the source code for the [Stateful Smart Contract](https://developer.algorand.org/docs/features/asc1/stateful/) that defines the logic of the application that manages the state of the application and handles the logic for determining the owner of the ASA. In the end in this module we have a function that provides to us the [TEAL](https://developer.algorand.org/docs/features/asc1/teal/) code for the approval and the clear program.
+   - *ASA Delegate Authority* - This module defines the source code for the [Stateless Smart Contract](https://developer.algorand.org/docs/features/asc1/stateless/) that is responsible for transferring the ASA to the rightful owner. This contract acts as an authority that provides the signature which guarantees that the ASA is transferred to the correct owner. 
+   - *ALGO Delegate Authority* - This module defines the source code for the Stateless Smart Contract that is responsible for refunding the ALGOs to the previous owner of the ASA. This contract acts as an authority that provides the signature which guarantees that after successful change of an ASA ownership the ALGOs bided from the previous owner will be refunded to him since he does not contain the ASA anymore. Additionally the Algo Delegate Authority receives all of the payments executed by the bidders.
+2. **App Services** - this component contains the services that talk with the Algorand Network. The application services are divided into 2 sub-components:
+   - *Initialization service* - This service is responsible for proper initialization of all the modules used in the application through various types of transactions executed on the Algorand Network. 
+   - *Interaction service* - This service performs the bidding action in the application. The bidding action represents an [Atomic Transfer](https://developer.algorand.org/docs/features/atomic_transfers/) of 4 transactions that will be described in more details later in this tutorial.
+3. **App Utilities** - this is the simples component that handles the developer's credentials and the Algorand Network transactions. We won't describe in more details this component because it is common for most projects. This component has 2 sub-components as well:
+   - *Credentials* - Handles the developer's credentials and provides us with a client through which we can interact with the network. I followed this [tutorial](https://developer.algorand.org/tutorials/creating-python-transaction-purestake-api/) in order to setup my client using the PureStake API.
+   - *Blockchain* - Contains functions that encapsulate and execute basic blockchain transactions on the Algorand Network such as: Payments, AssetTransfer, ApplicationCalls and etc. Those transactions are well described in the [Algorand Developer Documentation](https://developer.algorand.org/docs/).
+
