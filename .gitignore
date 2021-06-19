@@ -1,5 +1,8 @@
 config.yml
 .idea/
 src/__pycache__
+src/app_pyteal/__pycache__
+src/app_utils/__pycache__
+src/app_services/__pycache__
 
 */__pycache__

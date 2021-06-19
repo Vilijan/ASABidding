@@ -68,7 +68,8 @@ class AppInitializationService:
                                                                       manager_address=self.app_creator_address,
                                                                       reserve_address=self.app_creator_address,
                                                                       freeze_address=self.app_creator_address,
-                                                                      clawback_address=self.app_creator_address)
+                                                                      clawback_address=self.app_creator_address,
+                                                                      default_frozen=True)
 
     def setup_asa_delegate_smart_contract(self):
         if self.app_id == -1:

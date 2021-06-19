@@ -9,7 +9,6 @@ application_initialization_service = AppInitializationService(app_creator_pk=mai
                                                               asa_unit_name="wawa",
                                                               asa_asset_name="wawa")
 
-
 application_initialization_service.create_application()
 application_initialization_service.create_asa()
 application_initialization_service.setup_asa_delegate_smart_contract()
@@ -24,7 +23,6 @@ print(f'app_id: {application_initialization_service.app_id} \n'
       f'asa_delegate_authority_address: {application_initialization_service.asa_delegate_authority_address} \n'
       f'algo_delegate_authority_address: {application_initialization_service.algo_delegate_authority_address}')
 
-
 bidder_pk, bidder_address = get_developer_credentials(developer_id=1)
 
 app_interaction_service = AppInteractionService(app_id=application_initialization_service.app_id,
@@ -35,7 +33,6 @@ app_interaction_service.execute_bidding(bidder_name="wawa",
                                         bidder_private_key=bidder_pk,
                                         bidder_address=bidder_address,
                                         amount=3000)
-
 
 app_interaction_service.execute_bidding(bidder_name="pudge",
                                         bidder_private_key=main_dev_pk,
