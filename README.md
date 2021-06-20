@@ -751,6 +751,10 @@ We can see that the application state has been updated accordingly to match the 
 
 ## Final thoughts
 
-If you have made it this far I want to sincerely thank you for reading this solution. I hope that you learned something new and interesting as it was the case for me. This solution is intended for learning purposes only. It does not cover error checking and other edge cases therefore, should not be used as a production application.
+If you have made it this far I want to sincerely thank you for reading this solution. I hope that you learned something new and interesting as it was the case for me. 
 
-I want to thanks [Cossimo Bassi](https://developer.algorand.org/u/cusma/) for making a tutorial on using smart contracts in the [Algo Realm Game](https://developer.algorand.org/solutions/algorealm-nft-royalty-game/) which inspired me to make this application.
+I strongly believe that we are just starting to scratch the surface of the usage of smart contracts through creating different Decentralized Applications. I think that a lot of systems in the future will depend on signatures from smart contracts instead of some legal authorities. There is a really exciting future a head of us :)
+
+***This solution is intended for learning purposes only. It does not cover error checking and other edge cases therefore, should not be used as a production application.***
+
+In the end I want to thanks [Cossimo Bassi](https://developer.algorand.org/u/cusma/) for making a tutorial on using smart contracts in the [Algo Realm Game](https://developer.algorand.org/solutions/algorealm-nft-royalty-game/) which inspired me to make this application.
