@@ -769,7 +769,7 @@ We can see that the application state has been updated accordingly to match the 
 
 If you have made it this far I want to sincerely thank you for reading this solution. I hope that you learned something new and interesting as it was the case for me. 
 
-I strongly believe that we are just starting to scratch the surface of the usage of smart contracts through creating different Decentralized Applications. I think that a lot of systems in the future will depend on signatures from smart contracts instead of some legal authorities. There is a really exciting future a head of us :)
+I strongly believe that we are just starting to scratch the surface of the usage of smart contracts through creating different Decentralized Applications. I think that a lot of systems in the future will depend on signatures from smart contracts instead of some legal authorities. There is a really exciting future ahead of us :)
 
 ***This solution is intended for learning purposes only. It does not cover error checking and other edge cases therefore, should not be used as a production application.***
 
