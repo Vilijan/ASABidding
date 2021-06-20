@@ -491,5 +491,232 @@ As we have described previously we need to call the application only once in ord
 
 ### Application interaction service
 
+The application interaction service is responsible for executing bidding calls for the specified asa_id to the application with a specified app_id. 
 
+#### Initialization of the interaction service
+
+In order to initialize the interaction service we need to provide the *app_id* and the *asa_id* with which this service will interact. Since the interaction with the application also depends on the state of the application we need to provide the address of the current owner of the ASA and what is the current highest bided amount.
+
+```python
+ class AppInteractionService:
+
+    def __init__(self,
+                 app_id: int,
+                 asa_id: int,
+                 current_owner_address: str,
+                 current_highest_bid: int = DefaultValues.highestBid,
+                 teal_version: int = 2):
+        self.client = developer_credentials.get_client()
+        self.app_id = app_id
+        self.asa_id = asa_id
+        self.current_owner_address = current_owner_address
+        self.current_highest_bid = current_highest_bid
+        self.teal_version = teal_version
+
+        asa_delegate_authority_compiled = compileTeal(asa_delegate_authority_logic(app_id=self.app_id,
+                                                                                   asa_id=self.asa_id),
+                                                      mode=Mode.Signature,
+                                                      version=self.teal_version)
+
+        self.asa_delegate_authority_code_bytes = \
+            blockchain_utils.compile_program(client=self.client,
+                                             source_code=asa_delegate_authority_compiled)
+
+        self.asa_delegate_authority_address = algo_logic.address(self.asa_delegate_authority_code_bytes)
+
+        algo_delegate_authority_compiled = compileTeal(algo_delegate_authority_logic(app_id=self.app_id),
+                                                       mode=Mode.Signature,
+                                                       version=self.teal_version)
+
+        self.algo_delegate_authority_code_bytes = \
+            blockchain_utils.compile_program(client=self.client,
+                                             source_code=algo_delegate_authority_compiled)
+
+        self.algo_delegate_authority_address = algo_logic.address(self.algo_delegate_authority_code_bytes)
+```
+
+#### Executing bidding call
+
+The bidding call consists of atomic transfer of 4 transactions that were described in more details in the previous sections. In order to execute a bidding we need to provide the bidder name which is sent as an argument in the first transaction, the bidder's private key and address and the bided amount for the asset. If the transactions are approved by the Stateful and the Stateless Smart Contracts a change of ownership of the ASA will happen.
+
+```python
+     def execute_bidding(self,
+                        bidder_name: str,
+                        bidder_private_key: str,
+                        bidder_address: str,
+                        amount: int):
+        params = blockchain_utils.get_default_suggested_params(client=self.client)
+
+        # 1. Application call txn
+        bidding_app_call_txn = algo_txn.ApplicationCallTxn(sender=bidder_address,
+                                                           sp=params,
+                                                           index=self.app_id,
+                                                           app_args=[bidder_name],
+                                                           on_complete=algo_txn.OnComplete.NoOpOC)
+
+        # 2. Bidding payment transaction
+        biding_payment_txn = algo_txn.PaymentTxn(sender=bidder_address,
+                                                 sp=params,
+                                                 receiver=self.algo_delegate_authority_address,
+                                                 amt=amount)
+
+        # 3. Payment txn from algo delegate authority the current owner
+        algo_refund_txn = algo_txn.PaymentTxn(sender=self.algo_delegate_authority_address,
+                                              sp=params,
+                                              receiver=self.current_owner_address,
+                                              amt=self.current_highest_bid)
+
+        # 4. Asa opt-in for the bidder & asset transfer transaction
+        blockchain_utils.asa_opt_in(client=self.client,
+                                    sender_private_key=bidder_private_key,
+                                    asa_id=self.asa_id)
+
+        asa_transfer_txn = algo_txn.AssetTransferTxn(sender=self.asa_delegate_authority_address,
+                                                     sp=params,
+                                                     receiver=bidder_address,
+                                                     amt=1,
+                                                     index=self.asa_id,
+                                                     revocation_target=self.current_owner_address)
+
+        # Atomic transfer
+        gid = algo_txn.calculate_group_id([bidding_app_call_txn,
+                                           biding_payment_txn,
+                                           algo_refund_txn,
+                                           asa_transfer_txn])
+
+        bidding_app_call_txn.group = gid
+        biding_payment_txn.group = gid
+        algo_refund_txn.group = gid
+        asa_transfer_txn.group = gid
+
+        bidding_app_call_txn_signed = bidding_app_call_txn.sign(bidder_private_key)
+        biding_payment_txn_signed = biding_payment_txn.sign(bidder_private_key)
+
+        algo_refund_txn_logic_signature = algo_txn.LogicSig(self.algo_delegate_authority_code_bytes)
+        algo_refund_txn_signed = algo_txn.LogicSigTransaction(algo_refund_txn, algo_refund_txn_logic_signature)
+
+        asa_transfer_txn_logic_signature = algo_txn.LogicSig(self.asa_delegate_authority_code_bytes)
+        asa_transfer_txn_signed = algo_txn.LogicSigTransaction(asa_transfer_txn, asa_transfer_txn_logic_signature)
+
+        signed_group = [bidding_app_call_txn_signed,
+                        biding_payment_txn_signed,
+                        algo_refund_txn_signed,
+                        asa_transfer_txn_signed]
+
+        txid = self.client.send_transactions(signed_group)
+
+        blockchain_utils.wait_for_confirmation(self.client, txid)
+
+        self.current_owner_address = bidder_address
+        self.current_highest_bid = amount
+```
+
+## Application deployment on Algorand TestNet network
+
+The final thing that is left for us is to deploy and test the application on the network. 
+
+### Initialization of the application
+
+As the described earlier we can initialize the application with the *AppInitializationService* using the following steps:
+
+```python
+app_initialization_service = AppInitializationService(app_creator_pk=main_dev_pk,
+                                                      app_creator_address=main_dev_address,
+                                                      asa_unit_name="wawa",
+                                                      asa_asset_name="wawa",
+                                                      teal_version=3)
+
+app_initialization_service.create_application()
+
+app_initialization_service.create_asa()
+
+app_initialization_service.setup_asa_delegate_smart_contract()
+app_initialization_service.deposit_fee_funds_to_asa_delegate_authority()
+
+app_initialization_service.change_asa_credentials()
+
+app_initialization_service.setup_algo_delegate_smart_contract()
+app_initialization_service.deposit_fee_funds_to_algo_delegate_authority()
+
+app_initialization_service.setup_app_delegates_authorities()
+```
+After executing this code we deploy and initialize the application on the TestNet. We can print the properties of the deployed app an inspect them on the [AlgoExplorer](https://testnet.algoexplorer.io/)
+```python
+app_id: 17026927 
+asa_id: 17026938 
+asa_delegate_authority_address: U4R3SREIQFAVNCOMQITD4RWNH5LHCSO4BVAIWEJGNVVMLIYTHWXXPZ3Z5I 
+algo_delegate_authority_address: L3S72BCRBIY3V42GUNRERKDJ3ENIODBGJFAF53QJILJTBH5NTJQMYOZ6NU
+```
+
+If we inspect the global state of the application with id: 17026927 we see the following properties as expected:
+
+![Initialized app global state](https://github.com/Vilijan/ASABidding/blob/main/images/ApplicationGlobalState_AfterInitialization.png?raw=true)
+
+We can also inspect the technical properties of the ASA with id: 17026938
+
+![ASA Technical Properties](https://github.com/Vilijan/ASABidding/blob/main/images/ASA_TechnicalInformation.png?raw=true)
+
+We can see that the *Clawback Account* in the ASA is identical to the *ASA Delegate Address* in our application.
+
+### First bidding for the ASA
+
+After initialization of the application we can use the AppInteractionService to execute bidding transaction calls to the app. Lets execute our first bid with the following code.
+
+```python
+app_interaction_service = AppInteractionService(app_id=app_initialization_service.app_id,
+                                                asa_id=app_initialization_service.asa_id,
+                                                current_owner_address=main_dev_address,
+                                                teal_version=3)
+
+app_interaction_service.execute_bidding(bidder_name="Alice",
+                                        bidder_private_key=bidder_pk,
+                                        bidder_address=bidder_address,
+                                        amount=3000000)
+```
+After the execution we get the following transaction id
+```python
+Transaction TO55W6TK7IU7YG6FV6XECFFDGZQGKW5EQT5ECYGA4LFJICJMIJIA confirmed in round 14892176.
+```
+Since this transaction is an atomic transfer it has specific *group_id*. We inspect this *group_id* on the network as well and the application global state to see what has happened.
+
+#### Atomic transfer overview
+
+![First Atomic Transfer Overview](https://github.com/Vilijan/ASABidding/blob/main/images/FirstBidding_GroupID.png?raw=true)
+
+#### Application state overview
+
+![Bid 1 Application State](https://github.com/Vilijan/ASABidding/blob/main/images/FirstBidding_AppGlobalState.png?raw=true)
+
+We can see that the state of the application has been changed as expected. The *HighestBid* has been updated as well with the *TitleOwner* and the *OwnerAddress*.
+
+### Second bidding for the ASA
+
+We can execute second bidding with higher amount to test whether the ownership of the ASA will change.
+
+```python
+app_interaction_service.execute_bidding(bidder_name="Bob",
+                                        bidder_private_key=main_dev_pk,
+                                        bidder_address=main_dev_address,
+                                        amount=5000000)
+```
+
+We get the following transaction id
+
+```python
+Transaction IKI47OJU7XDZI6ATJJ75O44SM4DGWYWR6UDQQFAMM3JBIHBMVAAA confirmed in round 14892335.
+```
+
+#### Atomic transfer overview
+
+![Second Bid Atomic Transfer](https://github.com/Vilijan/ASABidding/blob/main/images/SecondBid_GroupTransaction.png?raw=true)
+
+We can see that the ASA has been transferred to the new owner, the old ALGOs were refunded to the old owner of the ASA and the new bid ALGOs has been transferred to the *Algo Delegate Authority address.*
+
+#### Application state overview
+
+![Bid 2 App State](https://github.com/Vilijan/ASABidding/blob/main/images/SecondBid_AppState.png?raw=true)
+
+We can see that the application state has been updated accordingly to match the newest highest bid.
+
+## Final thoughts
 

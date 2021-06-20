@@ -36,12 +36,12 @@ app_interaction_service = AppInteractionService(app_id=app_initialization_servic
                                                 current_owner_address=main_dev_address,
                                                 teal_version=3)
 
-app_interaction_service.execute_bidding(bidder_name="wawa",
+app_interaction_service.execute_bidding(bidder_name="Alice",
                                         bidder_private_key=bidder_pk,
                                         bidder_address=bidder_address,
-                                        amount=3000)
+                                        amount=3000000)
 
-app_interaction_service.execute_bidding(bidder_name="pudge",
+app_interaction_service.execute_bidding(bidder_name="Bob",
                                         bidder_private_key=main_dev_pk,
                                         bidder_address=main_dev_address,
-                                        amount=4000)
+                                        amount=5000000)
