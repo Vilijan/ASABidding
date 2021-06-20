@@ -4,7 +4,7 @@
 
 Through this solution I want to explain a system developed on the Algorand network that does automated transfer of an asset of interest to the person who has paid the most for that particular asset. 
 
-Lets imagine a scenario in the today's world where an entity wants to sell some arbitrary asset for the highest possible price. The process of bidding for the asset and the process of transferring the ownership of the asset involves a lot of 3rd parties which adds a lot of additional costs to the process and adds the need to trust unknown institutions who operate behind the scenes. In this blog post I describe a system that tries to replace the 3rd party institutions with a code which is best described as a Smart Contract. 
+Lets imagine a scenario in the today's world where an entity wants to sell some arbitrary asset for the highest possible price. The process of bidding for the asset and the process of transferring the ownership of the asset involves a lot of 3rd parties which adds a lot of additional costs to the process and adds the need to trust unknown institutions who mostly operate behind the scenes. In this blog post I describe a system that tries to replace the 3rd party institutions with a code which is best described as a Smart Contract. 
 
 We currently relay on a lot of signatures from well established institutions in order verify some processes. What if those signatures can be provided by compiling a deterministic program which is transparent and provides equal opportunity for everyone participating in the process ? 
 
@@ -19,7 +19,7 @@ We currently relay on a lot of signatures from well established institutions in 
 
 The decentralized application described in this solution has a goal to do automated bidding for a predefined Algorand Standard Asset (ASA). The usage process of the application is the following:
 
-1. Some entity creates an ASA that want to sell on the Algorand blockchain network. This ASA can be mapped to anything in the physical world.
+1. Some entity creates an ASA that wants to sell on the Algorand blockchain network. This ASA can be mapped to anything in the physical world. In this step the entity deploys a single instance of the application that handles the bidding for the defined ASA.
 2. Users i.e. bidders who want to buy this ASA will call the application with the specified amount of ALGOs they want to pay.
 
    - If the current bidder has provided the highest amount of ALGOs the ASA will be automatically transferred to the bidder's wallet. The person who previously held the ASA will get refund for his ALGOs because he is no longer the highest bidder.
@@ -82,7 +82,7 @@ The code of the ASA bidding application is well structured and separated in 3 ma
    - *Interaction service* - This service performs the bidding action in the application. The bidding action represents an [Atomic Transfer](https://developer.algorand.org/docs/features/atomic_transfers/) of 4 transactions that will be described in more details later in this tutorial.
 3. **App Utilities** - this is the simples component that handles the developer's credentials and the Algorand Network transactions. We won't describe in more details this component because it is common for most projects. This component has 2 sub-components as well:
    - *Credentials* - Handles the developer's credentials and provides us with a client through which we can interact with the network. I followed this [tutorial](https://developer.algorand.org/tutorials/creating-python-transaction-purestake-api/) in order to setup my client using the PureStake API.
-   - *Blockchain* - Contains functions that encapsulate and execute basic blockchain transactions on the Algorand Network such as: Payments, AssetTransfer, ApplicationCalls and etc. Those transactions are well described in the [Algorand Developer Documentation](https://developer.algorand.org/docs/).
+   - *Blockchain* - Contains functions that encapsulate and execute basic blockchain transactions on the Algorand Network such as: Payments, AssetTransfer, ApplicationCalls, etc. Those transactions are well described in the [Algorand Developer Documentation](https://developer.algorand.org/docs/).
 
 ## PyTeal Components
 
@@ -140,7 +140,7 @@ def setup_possible_app_calls_logic(assets_delegate_code, transfer_asa_logic):
 - **Setting up delegates** - App call with 3 arguments: ASADelegateAddress, AlgoDelegateAddress and asaOwnerAddress. This application call should be allowed to be executed only once. 
 - **Transferring the ASA** - Atomic transfer with 4 transactions which represents a single bidding.
   - Application call with arguments *new_owner_name: string*
-  - Payment to the *algoDelegateAddress* which represents the latest bid for the ASA.
+  - Payment to the *algoDelegateAddress* which represents the bid for the ASA.
   - Payment from the algoDelegateAddress to the old owner of the ASA which refunds the ALGOs that were paid from the previous bidder
   - Payment from the ASADelegateAddress that transfers the ASA from the old owner to the new one.
 
@@ -169,9 +169,9 @@ def setup_asset_delegates_logic():
     ])
 ```
 
-​		Here we are creating optional variables for the *asaDelegateAddress* and the *algoDelegateAddress* values. If those variables  contain some value it means that they are already setup up which should result in a setup failure. If those variables does not contain any value means that we are setting them up for the first time.
+​		Here we are creating optional variables for the *asaDelegateAddress* and the *algoDelegateAddress* values. If those variables  contain some value it means that they have already been set up which should result in a setup failure. If those variables does not contain any value it means that we are setting them up for the first time.
 
-4. **Transferring the ASA** - This is the most complex PyTeal code that handles the bidding logic in the application. This code runs when atomic transfer with 4 transaction is executed. The transactions were described previously.
+4. **Transferring the ASA** - This is the most complex PyTeal code that handles the bidding logic in the application. This code runs when atomic transfer with 4 transaction is executed. The atomic transfer transactions were described previously in the *Possible action calls* section.
 ```python
 def asa_transfer_logic():
     # Valid first transaction
@@ -242,7 +242,7 @@ def asa_transfer_logic():
 The updating of the ASA ownership can be summarized in the following steps
 
 - **First transaction is valid**  - the first transaction which is the application call is valid when the transaction type is *ApplicationCall* and when we have passed only one argument which is the name of the bidder.
-- **Second transaction is valid** - the second transaction which is the payment to the *algoDelegateAddress* that represents the latest bid for the ASA is valid when:
+- **Second transaction is valid** - the second transaction which is the payment to the *algoDelegateAddress* that represents the bid for the ASA is valid when:
   - The transaction type is Payment
   - The first and the second transaction have the same sender, this means that the caller of the application and the bidder are the same
   - If the newly bided amount is bigger than the current highest one
@@ -252,12 +252,14 @@ The updating of the ASA ownership can be summarized in the following steps
   - The sender of the transaction is the algoDelegateAddress which is responsible for refunding
   - The receiver of the transaction is the current address that is held in the asaOwnerAddress variable.
   - The payment amount is equal to the current highest bid that is held in the highestBid variable.
-- Fourth transaction is valid - the fourth transaction which is payment from the ASADelegateAddress that transfers the ASA from the old owner to the new one is valid when:
+- **Fourth transaction is valid** - the fourth transaction which is asset transfer from the ASADelegateAddress that transfers the ASA from the old owner to the new one is valid when:
   - The transaction type is AssetTransfer
   - The transaction sender is the ASADelegateAddress  which is responsible for transferring the ASA
   - The transaction receiver is the new owner address which is the sender of the first two transactions.
 
 When all of the 4 transactions are valid we update the state of the application and thus the approval program returns that the atomic transfer is valid. If any of those cases fails the approval program will reject the atomic transfer transaction.
+
+The *ASA Delegate Authority* will make sure that we are transferring the correct ASA.
 
 In the end we combine everything to get the approval and the clear programs.
 
@@ -316,4 +318,178 @@ def algo_delegate_authority_logic(app_id: int):
 After we compile this PyTeal code we will obtain a unique address that will represent the **AlgoDelegateAddress** in our application for the provided **app_id**.
 
 ## Application Services
+
+The purpose of Application Services is to decouple the code of the application that interacts with the Algorand network. This way of decoupling the code enables us to build different UIs for the application without ever touching the core part of the code. In principle we should be able to build mobile application, CLI application or web application while the Application Services remain unchanged. On top of that this makes the application more readable and easier to maintain.
+
+### Application Initialization Service
+
+This service is responsible for initialization of the application. After executing all of the required methods in this service we will end up with an application deployed on the TestNet that is ready to accept biddings for the ASA of interest.
+
+#### Initialization of the service
+
+```python
+class AppInitializationService:
+
+    def __init__(self,
+                 app_creator_pk: str,
+                 app_creator_address: str,
+                 asa_unit_name: str,
+                 asa_asset_name: str,
+                 teal_version: int = 2):
+        self.app_creator_pk = app_creator_pk
+        self.app_creator_address = app_creator_address
+        self.asa_unit_name = asa_unit_name
+        self.asa_asset_name = asa_asset_name
+        self.teal_version = teal_version
+
+        self.client = developer_credentials.get_client()
+        self.approval_program_code = approval_program()
+        self.clear_program_code = clear_program()
+
+        self.app_id = -1
+        self.asa_id = -1
+        self.asa_delegate_authority_address = ''
+        self.algo_delegate_authority_address = ''
+```
+In order to start the initialization of the service we must provide the app's creator private key and it's public address. Additionally we must provide the unit name and the asset name in order to create the Algorand Standard Asset that will be interacted through this application. In the initialization of this service we retrieve the *Approval Program* and the *Clear Program* that were defined in the App Source Code section. We as well will initialize a client property which is an algod.AlgodClient object that enables us the interaction with the Algorand network.
+
+At the end we will have the correct values for the following properties: *app_id*, *asa_id*, *asa_delegate_authority_address* and *algo_delegate_authority_address*.
+
+#### Creating the application
+
+```python
+    def create_application(self):
+        approval_program_compiled = compileTeal(self.approval_program_code,
+                                                mode=Mode.Application,
+                                                version=self.teal_version)
+        clear_program_compiled = compileTeal(self.clear_program_code,
+                                             mode=Mode.Application,
+                                             version=self.teal_version)
+
+        approval_program_bytes = blockchain_utils.compile_program(client=self.client,
+                                                                  source_code=approval_program_compiled)
+        
+        clear_program_bytes = blockchain_utils.compile_program(client=self.client,
+                                                               source_code=clear_program_compiled)
+
+        global_schema = algo_txn.StateSchema(num_uints=AppVariables.number_of_int(),
+                                             num_byte_slices=AppVariables.number_of_str())
+
+        local_schema = algo_txn.StateSchema(num_uints=0,
+                                            num_byte_slices=0)
+
+        self.app_id = blockchain_utils.create_application(client=self.client,
+                                                          creator_private_key=self.app_creator_pk,
+                                                          approval_program=approval_program_bytes,
+                                                          clear_program=clear_program_bytes,
+                                                          global_schema=global_schema,
+                                                          local_schema=local_schema,
+                                                          app_args=None)
+```
+
+In this method call we compile the teal code created using the PyTeal sdk and submit an application transaction with the appropriate parameters. If this transaction succeed we have deployed our bidding application on the Algorand TestNet network.
+
+#### ASA Creation
+
+In this method we create the Algorand Standard Asset for which the users will bid through the application. We should note here that the we set the ASA to be frozen because we want the transferring of the ASA to be only through the *ASA Delegate Authority* address
+
+```python
+    def create_asa(self):
+        self.asa_id = blockchain_utils.create_algorand_standard_asset(client=self.client,
+                                                                      creator_private_key=self.app_creator_pk,
+                                                                      unit_name=self.asa_unit_name,
+                                                                      asset_name=self.asa_asset_name,
+                                                                      total=1,
+                                                                      decimals=0,
+                                                                      manager_address=self.app_creator_address,
+                                                                      reserve_address=self.app_creator_address,
+                                                                      freeze_address=self.app_creator_address,
+                                                                      clawback_address=self.app_creator_address,
+                                                                      default_frozen=True)
+
+```
+
+#### Setting up ASA Delegate Authority
+
+In this method we compile the PyTeal code used for the ASA Delegate Authority for the previously created **app_id** and **asa_id**. At the end we receive an asa_delegate_authority_address which represents a unique address that can act as any other address on the network. Note that if we compile the asa_delegate_authority_logic with different app_id or asa_id we will end up with different address.
+
+```python
+    def setup_asa_delegate_smart_contract(self):
+        
+        asa_delegate_authority_compiled = compileTeal(asa_delegate_authority_logic(app_id=self.app_id,
+                                                                                   asa_id=self.asa_id),
+                                                      mode=Mode.Signature,
+                                                      version=self.teal_version)
+
+        asa_delegate_authority_bytes = blockchain_utils.compile_program(client=self.client,
+                                                                       source_code=asa_delegate_authority_compiled)
+
+        self.asa_delegate_authority_address = algo_logic.address(asa_delegate_authority_bytes)
+```
+#### Depositing fee funds to the ASA Delegate Authority
+
+Here we just deposit some ALGOs to the ASA Delegate Authority for transaction fees. Note that if the authority addresses run out of ALGO the application won't work because they would not be able to pay the fees to the Algorand Network.
+
+```python
+    def deposit_fee_funds_to_asa_delegate_authority(self):
+        
+        blockchain_utils.execute_payment(client=self.client,
+                                         sender_private_key=self.app_creator_pk,
+                                         reciever_address=self.asa_delegate_authority_address,
+                                         amount=1000000)
+```
+#### Changing the management of the ASA
+
+After the first creation of the ASA we have set up the management credentials to the creator of the application. We want to remove all the management properties of the ASA so they could not be modified in the future. The only thing that we want to set up is the *clawback_address* property to be the address of the ASA Delegate Authority. In this way only that address can act as an clawback for the ASA.
+
+```python
+    def change_asa_credentials(self):
+        blockchain_utils.change_asa_management(client=self.client,
+                                               current_manager_pk=self.app_creator_pk,
+                                               asa_id=self.asa_id,
+                                               manager_address="",
+                                               reserve_address=None,
+                                               freeze_address="",
+                                               clawback_address=self.asa_delegate_authority_address)
+```
+
+#### Setting up Algo Delegate Authority
+
+In this method we compile the PyTeal code used for the Algo Delegate Authority for the previously created **app_id**. At the end we receive an algo_delegate_authority_address which represents a unique address that can act as any other address on the network. Note that if we compile the algo_delegate_authority_logic with different app_id we will end up with different address.
+
+```python
+    def setup_algo_delegate_smart_contract(self):
+        algo_delegate_authority_compiled = compileTeal(algo_delegate_authority_logic(app_id=self.app_id),
+                                                       mode=Mode.Signature,
+                                                       version=self.teal_version)
+
+        algo_delegate_authority_bytes = blockchain_utils.compile_program(client=self.client,
+                                                                      source_code=algo_delegate_authority_compiled)
+
+        self.algo_delegate_authority_address = algo_logic.address(algo_delegate_authority_bytes)
+```
+At the end we also deposit some ALGO funds to the *algo_delegate_authority_address* for transaction fees.
+
+#### Setting up the delegate authorities in the application variables
+
+As we have described previously we need to call the application only once in order to set up the asaDelegateAddress, algoDelegateAddress and asaOwnerAddress global properties of the application. We pass those values as parameters to the application. When we pass the addresses as arguments we need to decode the 32 bytes string address into its address bytes and checksum.
+
+```python
+    def setup_app_delegates_authorities(self):
+        app_args = [
+            decode_address(self.asa_delegate_authority_address),
+            decode_address(self.algo_delegate_authority_address),
+            decode_address(self.app_creator_address)
+        ]
+
+        blockchain_utils.call_application(client=self.client,
+                                          caller_private_key=self.app_creator_pk,
+                                          app_id=self.app_id,
+                                          on_comlete=algo_txn.OnComplete.NoOpOC,
+                                          app_args=app_args)
+```
+
+### Application interaction service
+
+
 

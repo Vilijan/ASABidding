@@ -36,13 +36,18 @@ class AppInitializationService:
         self.algo_delegate_authority_address = ''
 
     def create_application(self):
-        approval_program_compiled = compileTeal(self.approval_program_code, mode=Mode.Application,
+        approval_program_compiled = compileTeal(self.approval_program_code,
+                                                mode=Mode.Application,
                                                 version=self.teal_version)
-        clear_program_compiled = compileTeal(self.clear_program_code, mode=Mode.Application, version=self.teal_version)
+        clear_program_compiled = compileTeal(self.clear_program_code,
+                                             mode=Mode.Application,
+                                             version=self.teal_version)
 
         approval_program_bytes = blockchain_utils.compile_program(client=self.client,
                                                                   source_code=approval_program_compiled)
-        clear_program_bytes = blockchain_utils.compile_program(client=self.client, source_code=clear_program_compiled)
+
+        clear_program_bytes = blockchain_utils.compile_program(client=self.client,
+                                                               source_code=clear_program_compiled)
 
         global_schema = algo_txn.StateSchema(num_uints=AppVariables.number_of_int(),
                                              num_byte_slices=AppVariables.number_of_str())
