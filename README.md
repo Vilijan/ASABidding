@@ -8,13 +8,6 @@ Lets imagine a scenario in the today's world where an entity wants to sell some 
 
 We currently relay on a lot of signatures from well established institutions in order verify some processes. What if those signatures can be provided by compiling a deterministic program which is transparent and provides equal opportunity for everyone participating in the process ? 
 
-## Table of content
-
-[TOC]
-
-
-
-
 ## Application Usage
 
 The decentralized application described in this solution has a goal to do automated bidding for a predefined Algorand Standard Asset (ASA). The usage process of the application is the following:
@@ -720,3 +713,6 @@ We can see that the application state has been updated accordingly to match the 
 
 ## Final thoughts
 
+If you have made it this far I want to sincerely thank you for reading this solution. I hope that you learned something new and interesting as it was the case for me. This solution is intended for learning purposes only. It does not cover error checking and other edge cases therefore, should not be used as a production application.
+
+I want to thanks [Cossimo Bassi](https://developer.algorand.org/u/cusma/) for making a tutorial on using smart contracts in the [Algo Realm Game](https://developer.algorand.org/solutions/algorealm-nft-royalty-game/) which inspired me to make this application.
