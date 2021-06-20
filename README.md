@@ -1,5 +1,25 @@
 # Algorand Standard Asset bidding application
 
+## Environment setup
+
+- `pip install requirements.txt`
+
+- Configure a `config.yml` file with the properties shown below:
+
+  ```yaml
+  client_credentials:
+    token: TOKEN_VALUE
+    address: ADDRESS_VALUE
+  
+  main_developer_credentials:
+    private_key: PRIVATE_KEY_VALUE
+    public_key: PUBLIC_KEY_VALUE
+  
+  developer_1_credentials:
+    private_key: PRIVATE_KEY_VALUE
+    public_key: PUBLIC_KEY_VALUE
+  ```
+
 ## Overview
 
 Through this solution I want to explain a system developed on the Algorand network that does automated transfer of an asset of interest to the person who has paid the most for that particular asset. 
