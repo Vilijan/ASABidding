@@ -8,6 +8,42 @@ Lets imagine a scenario in the today's world where an entity wants to sell some 
 
 We currently relay on a lot of signatures from well established institutions in order verify some processes. What if those signatures can be provided by compiling a deterministic program which is transparent and provides equal opportunity for everyone participating in the process ? 
 
+## Table of Content
+
+- [Algorand Standard Asset bidding application](#algorand-standard-asset-bidding-application)
+  * [Overview](#overview)
+  * [Application Usage](#application-usage)
+  * [Application architecture](#application-architecture)
+  * [PyTeal Components](#pyteal-components)
+    + [App Source Code](#app-source-code)
+    + [ASA Delegate authority](#asa-delegate-authority)
+    + [Algo Delegate Authority](#algo-delegate-authority)
+  * [Application Services](#application-services)
+    + [Application Initialization Service](#application-initialization-service)
+      - [Initialization of the service](#initialization-of-the-service)
+      - [Creating the application](#creating-the-application)
+      - [ASA Creation](#asa-creation)
+      - [Setting up ASA Delegate Authority](#setting-up-asa-delegate-authority)
+      - [Depositing fee funds to the ASA Delegate Authority](#depositing-fee-funds-to-the-asa-delegate-authority)
+      - [Changing the management of the ASA](#changing-the-management-of-the-asa)
+      - [Setting up Algo Delegate Authority](#setting-up-algo-delegate-authority)
+      - [Setting up the delegate authorities in the application variables](#setting-up-the-delegate-authorities-in-the-application-variables)
+    + [Application interaction service](#application-interaction-service)
+      - [Initialization of the interaction service](#initialization-of-the-interaction-service)
+      - [Executing bidding call](#executing-bidding-call)
+  * [Application deployment on Algorand TestNet network](#application-deployment-on-algorand-testnet-network)
+    + [Initialization of the application](#initialization-of-the-application)
+    + [First bidding for the ASA](#first-bidding-for-the-asa)
+      - [Atomic transfer overview](#atomic-transfer-overview)
+      - [Application state overview](#application-state-overview)
+    + [Second bidding for the ASA](#second-bidding-for-the-asa)
+      - [Atomic transfer overview](#atomic-transfer-overview-1)
+      - [Application state overview](#application-state-overview-1)
+  * [Final thoughts](#final-thoughts)
+
+<small><i><a href='http://ecotrust-canada.github.io/markdown-toc/'>Table of contents generated with markdown-toc</a></i></small>
+
+
 ## Application Usage
 
 The decentralized application described in this solution has a goal to do automated bidding for a predefined Algorand Standard Asset (ASA). The usage process of the application is the following:
@@ -675,6 +711,8 @@ Since this transaction is an atomic transfer it has specific *group_id*. We insp
 #### Atomic transfer overview
 
 ![First Atomic Transfer Overview](https://github.com/Vilijan/ASABidding/blob/main/images/FirstBidding_GroupID.png?raw=true)
+
+We can see that the ASA has been transferred to the new owner, the old ALGOs were refunded to the old owner of the ASA and the new bid ALGOs has been transferred to the *Algo Delegate Authority address.*
 
 #### Application state overview
 
