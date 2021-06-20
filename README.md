@@ -20,28 +20,12 @@ We currently relay on a lot of signatures from well established institutions in 
     + [Algo Delegate Authority](#algo-delegate-authority)
   * [Application Services](#application-services)
     + [Application Initialization Service](#application-initialization-service)
-      - [Initialization of the service](#initialization-of-the-service)
-      - [Creating the application](#creating-the-application)
-      - [ASA Creation](#asa-creation)
-      - [Setting up ASA Delegate Authority](#setting-up-asa-delegate-authority)
-      - [Depositing fee funds to the ASA Delegate Authority](#depositing-fee-funds-to-the-asa-delegate-authority)
-      - [Changing the management of the ASA](#changing-the-management-of-the-asa)
-      - [Setting up Algo Delegate Authority](#setting-up-algo-delegate-authority)
-      - [Setting up the delegate authorities in the application variables](#setting-up-the-delegate-authorities-in-the-application-variables)
     + [Application interaction service](#application-interaction-service)
-      - [Initialization of the interaction service](#initialization-of-the-interaction-service)
-      - [Executing bidding call](#executing-bidding-call)
   * [Application deployment on Algorand TestNet network](#application-deployment-on-algorand-testnet-network)
     + [Initialization of the application](#initialization-of-the-application)
     + [First bidding for the ASA](#first-bidding-for-the-asa)
-      - [Atomic transfer overview](#atomic-transfer-overview)
-      - [Application state overview](#application-state-overview)
     + [Second bidding for the ASA](#second-bidding-for-the-asa)
-      - [Atomic transfer overview](#atomic-transfer-overview-1)
-      - [Application state overview](#application-state-overview-1)
   * [Final thoughts](#final-thoughts)
-
-<small><i><a href='http://ecotrust-canada.github.io/markdown-toc/'>Table of contents generated with markdown-toc</a></i></small>
 
 
 ## Application Usage
@@ -147,7 +131,10 @@ def application_start(initialization_code,
               If(are_actions_used, application_actions, Return(Int(0))))
 ```
 
-1. **Application initialization** - from the image above we can see that this code will only run when the application's id is 0 which means that this is the first creation of the application. In this state we want to initialize the global variables of the application to which we know the default values.
+#### Application initialization
+
+From the image above we can see that this code will only run when the application's id is 0 which means that this is the first creation of the application. In this state we want to initialize the global variables of the application to which we know the default values.
+
 ```python
 def app_initialization_logic():
     return Seq([
@@ -156,7 +143,10 @@ def app_initialization_logic():
         Return(Int(1))
     ])
 ```
-2. **Possible application calls** - after we have initialized the application, now we can interact with it only through application calls. In the ASA bidding application we have two possible applications calls:
+#### Possible application calls
+
+After we have initialized the application, now we can interact with it only through application calls. In the ASA bidding application we have two possible applications calls:
+
 ```python
 def setup_possible_app_calls_logic(assets_delegate_code, transfer_asa_logic):
     is_setting_up_delegates = Global.group_size() == Int(1)
@@ -173,7 +163,10 @@ def setup_possible_app_calls_logic(assets_delegate_code, transfer_asa_logic):
   - Payment from the algoDelegateAddress to the old owner of the ASA which refunds the ALGOs that were paid from the previous bidder
   - Payment from the ASADelegateAddress that transfers the ASA from the old owner to the new one.
 
-3. **Setting up delegates** - In this part of the application we setup the delegate authorities as application variables and also we setup the first owner of the ASA which is the creator of the ASA. With this we are making sure that the transfer of the assets is always happening through the right authorities. The setting up of the delegates can be performed only once.
+#### Setting up delegates
+
+In this part of the application we setup the delegate authorities as application variables and also we setup the first owner of the ASA which is the creator of the ASA. With this we are making sure that the transfer of the assets is always happening through the right authorities. The setting up of the delegates can be performed only once.
+
 ```python
 def setup_asset_delegates_logic():
     asa_delegate_authority = App.globalGetEx(Int(0), Bytes(AppVariables.asaDelegateAddress))
@@ -200,7 +193,10 @@ def setup_asset_delegates_logic():
 
 ​		Here we are creating optional variables for the *asaDelegateAddress* and the *algoDelegateAddress* values. If those variables  contain some value it means that they have already been set up which should result in a setup failure. If those variables does not contain any value it means that we are setting them up for the first time.
 
-4. **Transferring the ASA** - This is the most complex PyTeal code that handles the bidding logic in the application. This code runs when atomic transfer with 4 transaction is executed. The atomic transfer transactions were described previously in the *Possible action calls* section.
+#### Transferring the ASA
+
+This is the most complex PyTeal code that handles the bidding logic in the application. This code runs when atomic transfer with 4 transaction is executed. The atomic transfer transactions were described previously in the *Possible action calls* section.
+
 ```python
 def asa_transfer_logic():
     # Valid first transaction
@@ -757,4 +753,4 @@ I strongly believe that we are just starting to scratch the surface of the usage
 
 ***This solution is intended for learning purposes only. It does not cover error checking and other edge cases therefore, should not be used as a production application.***
 
-In the end I want to thanks [Cossimo Bassi](https://developer.algorand.org/u/cusma/) for making a tutorial on using smart contracts in the [Algo Realm Game](https://developer.algorand.org/solutions/algorealm-nft-royalty-game/) which inspired me to make this application.
+I want to thanks [Cossimo Bassi](https://developer.algorand.org/u/cusma/) for making a tutorial on using smart contracts in the [Algo Realm Game](https://developer.algorand.org/solutions/algorealm-nft-royalty-game/) which inspired me to make this application.
