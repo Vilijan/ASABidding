@@ -773,4 +773,4 @@ I strongly believe that we are just starting to scratch the surface of the usage
 
 ***This solution is intended for learning purposes only. It does not cover error checking and other edge cases therefore, should not be used as a production application.***
 
-I want to thanks [Cossimo Bassi](https://developer.algorand.org/u/cusma/) for making a tutorial on using smart contracts in the [Algo Realm Game](https://developer.algorand.org/solutions/algorealm-nft-royalty-game/) which inspired me to make this application.
+I want to thanks [Cosimo Bassi](https://developer.algorand.org/u/cusma/) for making a tutorial on using smart contracts in the [Algo Realm Game](https://developer.algorand.org/solutions/algorealm-nft-royalty-game/) which inspired me to make this application.
