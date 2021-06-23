@@ -396,7 +396,7 @@ class AppInitializationService:
         self.asa_delegate_authority_address = ''
         self.algo_delegate_authority_address = ''
 ```
-In order to start the initialization of the service we must provide the app's creator private key and it's public address. Additionally we must provide the unit name and the asset name in order to create the Algorand Standard Asset that will be interacted through this application. In the initialization of this service we retrieve the *Approval Program* and the *Clear Program* that were defined in the App Source Code section. We as well will initialize a client property which is an algod.AlgodClient object that enables us the interaction with the Algorand network.
+In order to start the initialization of the service we must provide the app's creator private key and its public address. Additionally we must provide the unit name and the asset name in order to create the Algorand Standard Asset that will be interacted through this application. In the initialization of this service we retrieve the *Approval Program* and the *Clear Program* that were defined in the App Source Code section. We as well will initialize a client property which is an algod.AlgodClient object that enables us the interaction with the Algorand network.
 
 At the end we will have the correct values for the following properties: *app_id*, *asa_id*, *asa_delegate_authority_address* and *algo_delegate_authority_address*.
 
