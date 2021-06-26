@@ -2,6 +2,9 @@ from pyteal import *
 
 
 class AppVariables:
+    """
+    All the possible global variables in the application.
+    """
     titleOwner = "TitleOwner"
     highestBid = "HighestBid"
     asaOwnerAddress = "OwnerAddress"
@@ -18,12 +21,22 @@ class AppVariables:
 
 
 class DefaultValues:
+    """
+    The default values for the global variables initialized on the transaction that creates the application.
+    """
     titleOwner = "Silvio"
     highestBid = 0
 
 
 def application_start(initialization_code,
                       application_actions):
+    """
+    Possible states of the application when it is started.
+    :param initialization_code: This code will only run when the transaction that is creating the application is
+    submitted on the network.
+    :param application_actions: This code represents all the possible actions in the application.
+    :return:
+    """
     is_app_initialization = Txn.application_id() == Int(0)
     are_actions_used = Txn.on_completion() == OnComplete.NoOp
 
@@ -32,6 +45,11 @@ def application_start(initialization_code,
 
 
 def app_initialization_logic():
+    """
+    Initialization of the global variables in the application with the previously defined default values. We only add
+    a default name of the title owner and the highest bid which at the beginning is 0.
+    :return:
+    """
     return Seq([
         App.globalPut(Bytes(AppVariables.titleOwner), Bytes(DefaultValues.titleOwner)),
         App.globalPut(Bytes(AppVariables.highestBid), Int(DefaultValues.highestBid)),
@@ -50,8 +68,8 @@ def setup_possible_app_calls_logic(assets_delegate_code, transfer_asa_logic):
             2.2 - Payment to the algoDelegateAddress which represents the latest bid for the ASA.
             2.3 - Payment from the algoDelegateAddress to the old owner of the ASA which returns the algo funds.
             2.4 - Payment from the ASADelegateAddress that transfers the ASA from the old owner to the new one.
-    :param assets_delegate_code:
-    :param transfer_asa_logic:
+    :param assets_delegate_code: The code that is responsible for setting up the delegate authorities in the app.
+    :param transfer_asa_logic: The code that is responsible for the bidding logic.
     :return:
     """
     is_setting_up_delegates = Global.group_size() == Int(1)
@@ -63,9 +81,12 @@ def setup_possible_app_calls_logic(assets_delegate_code, transfer_asa_logic):
 
 def setup_asset_delegates_logic():
     """
-    Setting up delegates and first asset owner. Application call with two arguments
+    Setting up delegates and the first asset owner. The setup of the authorities can be performed only once. If we try
+    to modify them once they are saved the application code should result with failure. This application call receives
+    3 arguments:
     1. ASADelegateAddress: str - the address of the smart contract that is responsible for delegating the ASA
-    2. algoDelegateAddress: str - the address of the smart contract that is responsible for delegating the Algos
+    2. AlgoDelegateAddress: str - the address of the smart contract that is responsible for delegating the Algos
+    3. asaOwnerAddress: str - the address of the first owner of the NFT.
     :return:
     """
     asa_delegate_authority = App.globalGetEx(Int(0), Bytes(AppVariables.asaDelegateAddress))
@@ -94,7 +115,7 @@ def asa_transfer_logic():
     Transferring the ASA is atomic transfer with 4 transactions:
         1 - Application call with arguments new_owner_name: str
         2 - Payment to the algoDelegateAddress which represents the latest bid for the ASA.
-        3 - Payment from the algoDelegateAddress to the old owner of the ASA which returns the algo funds.
+        3 - Payment from the algoDelegateAddress to the old owner of the ASA which returns the ALGO funds.
         4 - Payment from the ASADelegateAddress that transfers the ASA from the old owner to the new one.
     :return:
     """
@@ -164,6 +185,10 @@ def asa_transfer_logic():
 
 
 def approval_program():
+    """
+    Approval program of the application. Combines all the logic of the application that was implemented previously.
+    :return:
+    """
     return application_start(initialization_code=app_initialization_logic(),
                              application_actions=
                              setup_possible_app_calls_logic(assets_delegate_code=setup_asset_delegates_logic(),
@@ -171,4 +196,8 @@ def approval_program():
 
 
 def clear_program():
+    """
+    Clear program of the application. Always approves.
+    :return:
+    """
     return Return(Int(1))

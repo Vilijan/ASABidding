@@ -20,6 +20,14 @@ class AppInitializationService:
                  asa_unit_name: str,
                  asa_asset_name: str,
                  teal_version: int = 2):
+        """
+        Object that defines the initialization of the bidding application.
+        :param app_creator_pk: Private key of the creator of the application.
+        :param app_creator_address: Address of the creator of the application.
+        :param asa_unit_name: The unit name of the NFT that will be created.
+        :param asa_asset_name: The name of the NFT.
+        :param teal_version: The version of the teal code.
+        """
         self.app_creator_pk = app_creator_pk
         self.app_creator_address = app_creator_address
         self.asa_unit_name = asa_unit_name
@@ -36,6 +44,11 @@ class AppInitializationService:
         self.algo_delegate_authority_address = ''
 
     def create_application(self):
+        """
+        Executes a transaction that creates the bidding application and publishes it on the network. It combines the
+        approval and the clear program with the corresponding schemas needed for the application.
+        :return:
+        """
         approval_program_compiled = compileTeal(self.approval_program_code,
                                                 mode=Mode.Application,
                                                 version=self.teal_version)
@@ -64,6 +77,11 @@ class AppInitializationService:
                                                           app_args=None)
 
     def create_asa(self):
+        """
+        Creates the NFT for which the customers will bid for. It is frozen because we want the transfer of the NFT to go
+        only through the clawback_address which is a Smart Contract.
+        :return:
+        """
         self.asa_id = blockchain_utils.create_algorand_standard_asset(client=self.client,
                                                                       creator_private_key=self.app_creator_pk,
                                                                       unit_name=self.asa_unit_name,
@@ -77,6 +95,10 @@ class AppInitializationService:
                                                                       default_frozen=True)
 
     def setup_asa_delegate_smart_contract(self):
+        """
+        Sets up the delegate authority that is responsible for transferring the NFT.
+        :return:
+        """
         if self.app_id == -1:
             raise ValueError('The application has not been created')
         if self.asa_id == -1:
@@ -93,6 +115,10 @@ class AppInitializationService:
         self.asa_delegate_authority_address = algo_logic.address(asa_delegate_authority_bytes)
 
     def deposit_fee_funds_to_asa_delegate_authority(self):
+        """
+        Deposits some amount of funds to the asa_delegate_address in order it to be able to pay for fees.
+        :return:
+        """
         if self.asa_delegate_authority_address == '':
             raise ValueError('The asa delegate authority has not been created')
 
@@ -102,6 +128,12 @@ class AppInitializationService:
                                          amount=1000000)
 
     def change_asa_credentials(self):
+        """
+        Changes the credentials of the NFT. All of the credentials features are disabled expect the clawback_address
+        which is the address of the asa_delegate_authority. Since the NFT is frozen at the beginning, it can be
+        transferred only throw the clawback_address.
+        :return:
+        """
         if self.asa_id == -1:
             raise ValueError('The Algorand Standard Asset of interest has not been created')
 
@@ -117,6 +149,11 @@ class AppInitializationService:
                                                clawback_address=self.asa_delegate_authority_address)
 
     def setup_algo_delegate_smart_contract(self):
+        """
+        Sets up the delegate authority that is responsible for receiving the ALGOs from the current owner of the NFT and
+        also refunding the old ALGOs to the previous one.
+        :return:
+        """
         if self.app_id == -1:
             raise ValueError('The application has not been created')
 
@@ -130,6 +167,10 @@ class AppInitializationService:
         self.algo_delegate_authority_address = algo_logic.address(algo_delegate_authority_bytes)
 
     def deposit_fee_funds_to_algo_delegate_authority(self):
+        """
+        Deposits some algo funds to the algo_delegate_address that will handle the network's fees.
+        :return:
+        """
         if self.algo_delegate_authority_address == '':
             raise ValueError('The algo delegate authority has not been created')
 
@@ -139,6 +180,14 @@ class AppInitializationService:
                                          amount=1000000)
 
     def setup_app_delegates_authorities(self):
+        """
+        Calling the application to setup the delegate authorities addresses as global variables. We can execute this
+        call only once per application. We call the app with 3 arguments:
+            - asa_delegate_authority_address
+            - algo_delegate_authority_address
+            - asa_creator_address
+        :return:
+        """
         if self.app_id == -1:
             raise ValueError('The application has not been created')
 

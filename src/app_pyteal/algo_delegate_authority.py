@@ -3,8 +3,9 @@ from pyteal import *
 
 def algo_delegate_authority_logic(app_id: int):
     """
-    Signing authority for bidding app. Signs a group transactions and returns money to the owner.
-    :param app_id:
+    Signing authority for bidding app. This authority is responsible for receiving the ALGOs from the current bidder
+    that owns the NFT, while also refunding the ALGOs to the previous owner of the NFT.
+    :param app_id: int - the application to which this delegate will be responsible for.
     :return:
     """
     is_calling_right_app = Gtxn[0].application_id() == Int(app_id)

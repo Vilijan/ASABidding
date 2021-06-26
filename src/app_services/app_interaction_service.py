@@ -19,6 +19,14 @@ class AppInteractionService:
                  current_owner_address: str,
                  current_highest_bid: int = DefaultValues.highestBid,
                  teal_version: int = 2):
+        """
+        Object that defines the interactions with the application.
+        :param app_id: The app_id that will be interacted with.
+        :param asa_id: The asa_id for which the user will bid for.
+        :param current_owner_address: The current owner of the NFT.
+        :param current_highest_bid: The current highest bid.
+        :param teal_version: the teal version.
+        """
         self.client = developer_credentials.get_client()
         self.app_id = app_id
         self.asa_id = asa_id
@@ -52,6 +60,15 @@ class AppInteractionService:
                         bidder_private_key: str,
                         bidder_address: str,
                         amount: int):
+        """
+        Executing a bidding. If successful the NFT is transferred to the current bidder_address's while ALGOs bid
+        by the previous bidder are refunded to him.
+        :param bidder_name: The name of the current bidder sent as an argument.
+        :param bidder_private_key: The private key of the current bidder.
+        :param bidder_address: The address of the current bidder.
+        :param amount: The bid amount.
+        :return:
+        """
         params = blockchain_utils.get_default_suggested_params(client=self.client)
 
         # 1. Application call txn

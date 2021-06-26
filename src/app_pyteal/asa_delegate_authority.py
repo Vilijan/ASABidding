@@ -3,8 +3,10 @@ from pyteal import *
 
 def asa_delegate_authority_logic(app_id: int, asa_id: int):
     """
-    :param app_id:
-    :param asa_id:
+    Signing authority for the bidding application. This authority is responsible for transferring the NFT from one owner
+    to another one via AtomicTransfer transaction.
+    :param app_id: int - the application to which this delegate will be responsible for.
+    :param asa_id: int - the NFT that this authority can transfer.
     :return:
     """
     is_calling_right_app = Gtxn[0].application_id() == Int(app_id)
