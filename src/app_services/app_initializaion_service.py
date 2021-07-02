@@ -19,19 +19,22 @@ class AppInitializationService:
                  app_creator_address: str,
                  asa_unit_name: str,
                  asa_asset_name: str,
-                 teal_version: int = 2):
+                 app_duration: int,
+                 teal_version: int = 3):
         """
         Object that defines the initialization of the bidding application.
         :param app_creator_pk: Private key of the creator of the application.
         :param app_creator_address: Address of the creator of the application.
         :param asa_unit_name: The unit name of the NFT that will be created.
         :param asa_asset_name: The name of the NFT.
+        :param app_duration: The number of rounds that the bidding application will be available on the network.
         :param teal_version: The version of the teal code.
         """
         self.app_creator_pk = app_creator_pk
         self.app_creator_address = app_creator_address
         self.asa_unit_name = asa_unit_name
         self.asa_asset_name = asa_asset_name
+        self.app_duration = app_duration
         self.teal_version = teal_version
 
         self.client = developer_credentials.get_client()
@@ -203,7 +206,8 @@ class AppInitializationService:
         app_args = [
             decode_address(self.asa_delegate_authority_address),
             decode_address(self.algo_delegate_authority_address),
-            decode_address(self.app_creator_address)
+            decode_address(self.app_creator_address),
+            self.app_duration
         ]
 
         blockchain_utils.call_application(client=self.client,

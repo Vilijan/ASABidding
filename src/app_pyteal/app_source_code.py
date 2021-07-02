@@ -7,13 +7,15 @@ class AppVariables:
     """
     titleOwner = "TitleOwner"
     highestBid = "HighestBid"
-    asaOwnerAddress = "OwnerAddress"
+    asaOwnerAddress = "ASAOwnerAddress"
     asaDelegateAddress = "ASADelegateAddress"
     algoDelegateAddress = "AlgoDelegateAddress"
+    appStartRound = "appStartRound"
+    appEndRound = "appEndRound"
 
     @classmethod
     def number_of_int(cls):
-        return 1
+        return 3
 
     @classmethod
     def number_of_str(cls):
@@ -53,6 +55,7 @@ def app_initialization_logic():
     return Seq([
         App.globalPut(Bytes(AppVariables.titleOwner), Bytes(DefaultValues.titleOwner)),
         App.globalPut(Bytes(AppVariables.highestBid), Int(DefaultValues.highestBid)),
+        App.globalPut(Bytes(AppVariables.appStartRound), Global.round()),
         Return(Int(1))
     ])
 
@@ -61,7 +64,7 @@ def setup_possible_app_calls_logic(assets_delegate_code, transfer_asa_logic):
     """
     There are two possible options for executing the application actions:
     1. Setting up delegates
-        - App call with 3 arguments: ASADelegateAddress, AlgoDelegateAddress and asaOwnerAddress.
+        - App call with 4 arguments: ASADelegateAddress, AlgoDelegateAddress, asaOwnerAddress and appDuration.
     2. Transferring the ASA
         - Atomic transfer with 4 transactions:
             2.1 - Application call with arguments new_owner_name: str
@@ -81,12 +84,14 @@ def setup_possible_app_calls_logic(assets_delegate_code, transfer_asa_logic):
 
 def setup_asset_delegates_logic():
     """
-    Setting up delegates and the first asset owner. The setup of the authorities can be performed only once. If we try
-    to modify them once they are saved the application code should result with failure. This application call receives
-    3 arguments:
+    Setting up delegates, first asset owner and the app duration. The setup of the authorities can be performed only once.
+    If we try to modify them once they have been saved the application code should result with failure.
+    This application call receives 4 arguments:
     1. ASADelegateAddress: str - the address of the smart contract that is responsible for delegating the ASA
     2. AlgoDelegateAddress: str - the address of the smart contract that is responsible for delegating the Algos
     3. asaOwnerAddress: str - the address of the first owner of the NFT.
+    4. appDuration: int - the number of Rounds that the application will be available on the Network. The last round is
+    calculated as: appStartRound + appDuration.
     :return:
     """
     asa_delegate_authority = App.globalGetEx(Int(0), Bytes(AppVariables.asaDelegateAddress))
@@ -96,10 +101,13 @@ def setup_asset_delegates_logic():
         Return(Int(0))
     ])
 
+    start_round = App.globalGet(Bytes(AppVariables.appStartRound))
+
     setup_delegates = Seq([
         App.globalPut(Bytes(AppVariables.asaDelegateAddress), Txn.application_args[0]),
         App.globalPut(Bytes(AppVariables.algoDelegateAddress), Txn.application_args[1]),
         App.globalPut(Bytes(AppVariables.asaOwnerAddress), Txn.application_args[2]),
+        App.globalPut(Bytes(AppVariables.appEndRound), Add(start_round, Btoi(Txn.application_args[3]))),
         Return(Int(1))
     ])
 
@@ -165,6 +173,10 @@ def asa_transfer_logic():
                                   is_paid_from_asa_delegate_authority,
                                   is_the_new_owner_receiving_the_asa)
 
+    # Valid time
+    end_round = App.globalGet(Bytes(AppVariables.appEndRound))
+    is_app_active = Global.round() <= end_round
+
     # Updating the app state
     update_owner_name = App.globalPut(Bytes(AppVariables.titleOwner), Gtxn[0].application_args[0])
     update_highest_bid = App.globalPut(Bytes(AppVariables.highestBid), Gtxn[1].amount())
@@ -179,7 +191,8 @@ def asa_transfer_logic():
     are_valid_transactions = And(valid_first_transaction,
                                  valid_second_transaction,
                                  valid_third_transaction,
-                                 valid_forth_transaction)
+                                 valid_forth_transaction,
+                                 is_app_active)
 
     return If(are_valid_transactions, update_app_state, Seq([Return(Int(0))]))
 
