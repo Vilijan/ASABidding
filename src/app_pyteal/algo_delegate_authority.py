@@ -4,16 +4,20 @@ from pyteal import *
 def algo_delegate_authority_logic(app_id: int):
     """
     Signing authority for bidding app. This authority is responsible for receiving the ALGOs from the current bidder
-    that owns the NFT, while also refunding the ALGOs to the previous owner of the NFT.
+    that owns the NFT, refunding the ALGOs to the previous owner of the NFT and after the bidding termination from this
+    address we pay the ALGOs to the seller of the NFT.
     :param app_id: int - the application to which this delegate will be responsible for.
     :return:
     """
-    is_calling_right_app = Gtxn[0].application_id() == Int(app_id)
-    is_acceptable_fee = Gtxn[2].fee() <= Int(1000)
-    is_valid_close_to_address = Gtxn[2].asset_close_to() == Global.zero_address()
-    is_valid_rekey_to_address = Gtxn[2].rekey_to() == Global.zero_address()
 
-    return And(is_calling_right_app,
-               is_acceptable_fee,
-               is_valid_close_to_address,
-               is_valid_rekey_to_address)
+    is_bidding = Global.group_size() == Int(4)
+
+    return If(is_bidding,
+              And(Gtxn[0].application_id() == Int(app_id),
+                  Gtxn[2].fee() <= Int(1000),
+                  Gtxn[2].asset_close_to() == Global.zero_address(),
+                  Gtxn[2].rekey_to() == Global.zero_address()),
+              And(Gtxn[0].application_id() == Int(app_id),
+                  Gtxn[1].fee() <= Int(1000),
+                  Gtxn[1].asset_close_to() == Global.zero_address(),
+                  Gtxn[1].rekey_to() == Global.zero_address()))

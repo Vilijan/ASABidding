@@ -37,17 +37,16 @@ app_interaction_service = AppInteractionService(app_id=app_initialization_servic
                                                 current_owner_address=main_dev_address,
                                                 teal_version=3)
 
-app_interaction_service.execute_bidding(bidder_name="Alice",
-                                        bidder_private_key=bidder_pk,
+app_interaction_service.execute_bidding(bidder_private_key=bidder_pk,
                                         bidder_address=bidder_address,
                                         amount=3000000)
 
-app_interaction_service.execute_bidding(bidder_name="Bob",
-                                        bidder_private_key=main_dev_pk,
+app_interaction_service.execute_bidding(bidder_private_key=main_dev_pk,
                                         bidder_address=main_dev_address,
                                         amount=5000000)
 
-app_interaction_service.execute_bidding(bidder_name="Wawa",
-                                        bidder_private_key=bidder_pk,
+app_interaction_service.execute_bidding(bidder_private_key=bidder_pk,
                                         bidder_address=bidder_address,
                                         amount=5000005)
+
+app_interaction_service.pay_to_seller(asa_seller_address=app_initialization_service.app_creator_address)

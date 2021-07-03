@@ -56,14 +56,12 @@ class AppInteractionService:
         self.algo_delegate_authority_address = algo_logic.address(self.algo_delegate_authority_code_bytes)
 
     def execute_bidding(self,
-                        bidder_name: str,
                         bidder_private_key: str,
                         bidder_address: str,
                         amount: int):
         """
         Executing a bidding. If successful the NFT is transferred to the current bidder_address's while ALGOs bid
         by the previous bidder are refunded to him.
-        :param bidder_name: The name of the current bidder sent as an argument.
         :param bidder_private_key: The private key of the current bidder.
         :param bidder_address: The address of the current bidder.
         :param amount: The bid amount.
@@ -75,7 +73,6 @@ class AppInteractionService:
         bidding_app_call_txn = algo_txn.ApplicationCallTxn(sender=bidder_address,
                                                            sp=params,
                                                            index=self.app_id,
-                                                           app_args=[bidder_name],
                                                            on_complete=algo_txn.OnComplete.NoOpOC)
 
         # 2. Bidding payment transaction
@@ -133,3 +130,44 @@ class AppInteractionService:
 
         self.current_owner_address = bidder_address
         self.current_highest_bid = amount
+
+    def pay_to_seller(self, asa_seller_address):
+        """
+        Executes the Atomic transfer that pays to the seller of the ASA the highest bid of the ALGOs.
+        :return:
+        """
+
+        params = blockchain_utils.get_default_suggested_params(client=self.client)
+
+        # 1. Application call txn
+        bidding_app_call_txn = algo_txn.ApplicationCallTxn(sender=self.algo_delegate_authority_address,
+                                                           sp=params,
+                                                           index=self.app_id,
+                                                           on_complete=algo_txn.OnComplete.NoOpOC)
+
+        # 2. Payment transaction
+        algo_refund_txn = algo_txn.PaymentTxn(sender=self.algo_delegate_authority_address,
+                                              sp=params,
+                                              receiver=asa_seller_address,
+                                              amt=self.current_highest_bid)
+
+        # Atomic transfer
+        gid = algo_txn.calculate_group_id([bidding_app_call_txn,
+                                           algo_refund_txn])
+
+        bidding_app_call_txn.group = gid
+        algo_refund_txn.group = gid
+
+        bidding_app_call_txn_logic_signature = algo_txn.LogicSig(self.algo_delegate_authority_code_bytes)
+        bidding_app_call_txn_signed = algo_txn.LogicSigTransaction(bidding_app_call_txn,
+                                                                   bidding_app_call_txn_logic_signature)
+
+        algo_refund_txn_logic_signature = algo_txn.LogicSig(self.algo_delegate_authority_code_bytes)
+        algo_refund_txn_signed = algo_txn.LogicSigTransaction(algo_refund_txn, algo_refund_txn_logic_signature)
+
+        signed_group = [bidding_app_call_txn_signed,
+                        algo_refund_txn_signed]
+
+        txid = self.client.send_transactions(signed_group)
+
+        blockchain_utils.wait_for_confirmation(self.client, txid)

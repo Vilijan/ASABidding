@@ -185,10 +185,12 @@ class AppInitializationService:
     def setup_app_delegates_authorities(self):
         """
         Calling the application to setup the delegate authorities addresses as global variables. We can execute this
-        call only once per application. We call the app with 3 arguments:
+        call only once per application. We call the app with 5 arguments:
             - asa_delegate_authority_address
             - algo_delegate_authority_address
             - asa_creator_address
+            - end round for the bidding period
+            - asa_seller_address
         :return:
         """
         if self.app_id == -1:
@@ -207,7 +209,8 @@ class AppInitializationService:
             decode_address(self.asa_delegate_authority_address),
             decode_address(self.algo_delegate_authority_address),
             decode_address(self.app_creator_address),
-            self.app_duration
+            self.app_duration,
+            decode_address(self.app_creator_address),
         ]
 
         blockchain_utils.call_application(client=self.client,
