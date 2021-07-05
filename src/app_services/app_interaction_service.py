@@ -18,7 +18,7 @@ class AppInteractionService:
                  asa_id: int,
                  current_owner_address: str,
                  current_highest_bid: int = DefaultValues.highestBid,
-                 teal_version: int = 2):
+                 teal_version: int = 3):
         """
         Object that defines the interactions with the application.
         :param app_id: The app_id that will be interacted with.

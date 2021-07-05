@@ -62,7 +62,8 @@ def setup_possible_app_calls_logic(asset_authorities_code, transfer_asa_code, pa
     """
     There are 3 possible options for executing the application actions:
     1. Setting up authorities
-        - App call with 4 arguments: ASADelegateAddress, AlgoDelegateAddress, asaOwnerAddress and appDuration.
+        - App call with 5 arguments: ASADelegateAddress, AlgoDelegateAddress, asaOwnerAddress, appDuration
+        and ASASellerAddress.
     2. Transferring the ASA
         - Atomic transfer with 4 transactions:
             2.1 - Application call.
@@ -78,11 +79,11 @@ def setup_possible_app_calls_logic(asset_authorities_code, transfer_asa_code, pa
     :param payment_to_seller_code: The code that is responsible for paying the highest bid to the seller of the ASA.
     :return:
     """
-    is_setting_up_delegates = Global.group_size() == Int(1)
+    is_setting_up_asset_authorities = Global.group_size() == Int(1)
     is_transferring_asa = Global.group_size() == Int(4)
     is_payment_to_seller = Global.group_size() == Int(2)
 
-    return If(is_setting_up_delegates, asset_authorities_code,
+    return If(is_setting_up_asset_authorities, asset_authorities_code,
               If(is_transferring_asa, transfer_asa_code,
                  If(is_payment_to_seller, payment_to_seller_code, Return(Int(0)))))
 
