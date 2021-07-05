@@ -30,7 +30,6 @@ We currently depend on a lot of signatures from well established institutions in
 
 ## Table of Content
 
-- [Algorand Standard Asset bidding application](#algorand-standard-asset-bidding-application)
   * [Overview](#overview)
   * [Application Usage](#application-usage)
   * [Application architecture](#application-architecture)
@@ -44,9 +43,13 @@ We currently depend on a lot of signatures from well established institutions in
   * [Application deployment on Algorand TestNet network](#application-deployment-on-algorand-testnet-network)
     + [Initialization of the application](#initialization-of-the-application)
     + [First bidding for the ASA](#first-bidding-for-the-asa)
+      - [Atomic transfer overview](#atomic-transfer-overview)
+      - [Application state overview](#application-state-overview)
     + [Second bidding for the ASA](#second-bidding-for-the-asa)
+      - [Atomic transfer overview](#atomic-transfer-overview-1)
+      - [Application state overview](#application-state-overview-1)
+    + [Payment to the seller](#payment-to-the-seller-2)
   * [Final thoughts](#final-thoughts)
-
 
 ## Application Usage
 
@@ -101,6 +104,8 @@ app_interaction_service.execute_bidding(bidder_name="Alice",
                                         bidder_private_key=main_dev_pk,
                                         bidder_address=main_dev_address,
                                         amount=4000)
+# After end of the bidding period. 
+app_interaction_service.pay_to_seller(asa_seller_address=app_initialization_service.app_creator_address)
 ```
 
 ## Application architecture
@@ -124,23 +129,26 @@ In this section I will describe in more details the logic behind the PyTeal code
 
 ### App Source Code
 
-The [app source module](https://github.com/Vilijan/ASABidding/blob/main/src/app_pyteal/app_source_code.py) contains all of the logic for the Stateful Smart Contract which represents the ASA bidding application. The application has 5 global variables shown in the code snippet below.
+The [app source module](https://github.com/Vilijan/ASABidding/blob/main/src/app_pyteal/app_source_code.py) contains all of the logic for the Stateful Smart Contract which represents the ASA bidding application. The application has 7 global variables shown in the code snippet below.
 ```python
 class AppVariables:
-    titleOwner = "TitleOwner"
+    asaSellerAddress = "asaSellerAddress"
     highestBid = "HighestBid"
-    asaOwnerAddress = "OwnerAddress"
+    asaOwnerAddress = "ASAOwnerAddress"
     asaDelegateAddress = "ASADelegateAddress"
     algoDelegateAddress = "AlgoDelegateAddress"
+    appStartRound = "appStartRound"
+    appEndRound = "appEndRound"
 ```
 
-- **Title Owner** - string variable that defines the name of the current ASA owner. During a bidding application call this name is provided as an argument to the application call by the bidder.
-- **Highest bid** - integer variable that represents the current highest bid that the owner of the ASA paid. 
+- **ASA Seller Address** - string variable that represents the address of the seller of the ASA. Only this address is valid for receiving the funds from the bidding once the bidding period has ended.
+- **Highest Bid** - integer variable that represents the current highest bid that the owner of the ASA paid. 
 - **ASA Owner Address** - the owner of the address that contain the ASA. After a successful bidding application call this property is set to the sender of the bidder application call.
 - **ASA Delegate Address** - the address of the *ASA Delegate Authority* that is responsible for transferring the ASA. This variable can be set only once in the application.
 - **ALGO Delegate Address** - the address of the *ALGO Delegate Authority* that is responsible for refunding the ALGOs to the previous ASA owner. This variable can be set only once in the application.
+- **App Start Round** **&** **App End Round**  - Those variables represents the block interval on the Algorand network in which the ASA Bidding Application will accept bidding application calls. 
 
-The application can be executed in three different flows, the first one is the application initialization which is executed when the transaction is created. The second and the third flows are actions that can be performed on the application such as: setting up delegate authorities and executing a bidding.
+The application can be executed in four different flows, the first one is the application initialization which is executed when the transaction is created. The other 3 can be performed using application calls which can perform the following functionalities: setting up asset authorities, executing a bidding and paying to the seller of the ASA.
 
 ```python
 def application_start(initialization_code,
@@ -159,34 +167,39 @@ From the image above we can see that this code will only run when the applicatio
 ```python
 def app_initialization_logic():
     return Seq([
-        App.globalPut(Bytes(AppVariables.titleOwner), Bytes(DefaultValues.titleOwner)),
         App.globalPut(Bytes(AppVariables.highestBid), Int(DefaultValues.highestBid)),
+        App.globalPut(Bytes(AppVariables.appStartRound), Global.round()),
         Return(Int(1))
     ])
 ```
 #### Possible application calls
 
-After we have initialized the application, now we can interact with it only through application calls. In the ASA bidding application we have two possible applications calls:
+After we have initialized the application, now we can interact with it only through application calls. In the ASA bidding application we have 3 possible applications calls:
 
 ```python
-def setup_possible_app_calls_logic(assets_delegate_code, transfer_asa_logic):
-    is_setting_up_delegates = Global.group_size() == Int(1)
+def setup_possible_app_calls_logic(asset_authorities_code, transfer_asa_code, payment_to_seller_code):
+    is_setting_up_asset_authorities = Global.group_size() == Int(1)
     is_transferring_asa = Global.group_size() == Int(4)
+    is_payment_to_seller = Global.group_size() == Int(2)
 
-    return If(is_setting_up_delegates, assets_delegate_code,
-              If(is_transferring_asa, transfer_asa_logic, Return(Int(0))))
+    return If(is_setting_up_asset_authorities, asset_authorities_code,
+              If(is_transferring_asa, transfer_asa_code,
+                 If(is_payment_to_seller, payment_to_seller_code, Return(Int(0)))))
 ```
 
-- **Setting up delegates** - App call with 3 arguments: ASADelegateAddress, AlgoDelegateAddress and asaOwnerAddress. This application call should be allowed to be executed only once. 
-- **Transferring the ASA** - Atomic transfer with 4 transactions which represents a single bidding.
-  - Application call with arguments *new_owner_name: string*
+- **Setting up asset authorities** - Application call with 5 arguments: ASADelegateAddress, AlgoDelegateAddress, asaOwnerAddress. AppDuration and asaSellerAddress. This application call should be allowed to be executed only once. 
+- **Transferring the ASA** - Atomic transfer with 4 transactions which represents a single bidding. 
+  - Application call.
   - Payment to the *algoDelegateAddress* which represents the bid for the ASA.
   - Payment from the algoDelegateAddress to the old owner of the ASA which refunds the ALGOs that were paid from the previous bidder
   - Payment from the ASADelegateAddress that transfers the ASA from the old owner to the new one.
+- **Payment to the seller** - Atomic transfer with 2 transactions which represents the payment from the highest bid to the seller of the ASA. This atomic transfer can occur only after the bidding period of the application has ended.
+  - Application call.
+  - Payment from the algoDelegateAddress to the asaSellerAddress with amount equal to the highest bid.
 
-#### Setting up delegates
+#### Setting up asset authorities
 
-In this part of the application we setup the delegate authorities as application variables and also we setup the first owner of the ASA which is the creator of the ASA. With this we are making sure that the transfer of the assets is always happening through the right authorities. The setting up of the delegates can be performed only once.
+In this part of the application we setup the authorities and the global variables of the application.  With this we are making sure that the transfer of the assets is always happening through the right authorities and for the specified duration of time. This initialization code can be run only once.
 
 ```python
 def setup_asset_delegates_logic():
@@ -197,18 +210,15 @@ def setup_asset_delegates_logic():
         Return(Int(0))
     ])
 
-    setup_delegates = Seq([
+    start_round = App.globalGet(Bytes(AppVariables.appStartRound))
+
+    setup_authorities = Seq([
         App.globalPut(Bytes(AppVariables.asaDelegateAddress), Txn.application_args[0]),
         App.globalPut(Bytes(AppVariables.algoDelegateAddress), Txn.application_args[1]),
         App.globalPut(Bytes(AppVariables.asaOwnerAddress), Txn.application_args[2]),
+        App.globalPut(Bytes(AppVariables.appEndRound), Add(start_round, Btoi(Txn.application_args[3]))),
+        App.globalPut(Bytes(AppVariables.asaSellerAddress), Txn.application_args[4]),
         Return(Int(1))
-    ])
-
-    return Seq([
-        asa_delegate_authority,
-        algo_delegate_authority,
-        If(Or(asa_delegate_authority.hasValue(), algo_delegate_authority.hasValue()), 
-           setup_failed, setup_delegates)
     ])
 ```
 
@@ -221,11 +231,7 @@ This is the most complex PyTeal code that handles the bidding logic in the appli
 ```python
 def asa_transfer_logic():
     # Valid first transaction
-    first_transaction_is_application_call = Gtxn[0].type_enum() == TxnType.ApplicationCall
-    first_transaction_has_one_argument = Gtxn[0].application_args.length() == Int(1)
-
-    valid_first_transaction = And(first_transaction_is_application_call,
-                                  first_transaction_has_one_argument)
+    valid_first_transaction = Gtxn[0].type_enum() == TxnType.ApplicationCall
 
     # Valid second transaction
     second_transaction_is_payment = Gtxn[1].type_enum() == TxnType.Payment
@@ -266,12 +272,14 @@ def asa_transfer_logic():
                                   is_paid_from_asa_delegate_authority,
                                   is_the_new_owner_receiving_the_asa)
 
+    # Valid time
+    end_round = App.globalGet(Bytes(AppVariables.appEndRound))
+    is_app_active = Global.round() <= end_round
+
     # Updating the app state
-    update_owner_name = App.globalPut(Bytes(AppVariables.titleOwner), Gtxn[0].application_args[0])
     update_highest_bid = App.globalPut(Bytes(AppVariables.highestBid), Gtxn[1].amount())
     update_owner_address = App.globalPut(Bytes(AppVariables.asaOwnerAddress), Gtxn[1].sender())
     update_app_state = Seq([
-        update_owner_name,
         update_highest_bid,
         update_owner_address,
         Return(Int(1))
@@ -280,32 +288,81 @@ def asa_transfer_logic():
     are_valid_transactions = And(valid_first_transaction,
                                  valid_second_transaction,
                                  valid_third_transaction,
-                                 valid_forth_transaction)
+                                 valid_forth_transaction,
+                                 is_app_active)
 
     return If(are_valid_transactions, update_app_state, Seq([Return(Int(0))]))
 ```
 
-The updating of the ASA ownership can be summarized in the following steps
+The updating of the ASA ownership can be summarized in the following conditions:
 
-- **First transaction is valid**  - the first transaction which is the application call is valid when the transaction type is *ApplicationCall* and when we have passed only one argument which is the name of the bidder.
+- **First transaction is valid**  - the first transaction which is the application call is valid when the transaction type is *ApplicationCall*.
 - **Second transaction is valid** - the second transaction which is the payment to the *algoDelegateAddress* that represents the bid for the ASA is valid when:
-  - The transaction type is Payment
-  - The first and the second transaction have the same sender, this means that the caller of the application and the bidder are the same
-  - If the newly bided amount is bigger than the current highest one
-  - If the receiver of the payment i.e bid is the algoDelegateAddress
+  - The transaction type is Payment.
+  - The first and the second transaction have the same sender, this means that the caller of the application and the bidder are the same.
+  - If the newly bided amount is bigger than the current highest one we should allow this bidding to happen.
+  - If the receiver of the payment bidding amount is the algoDelegateAddress.
 - **Third transaction is valid** - the third transaction which is payment from the algoDelegateAddress to the old owner of the ASA which refunds the ALGOs that were paid from the previous bidder is valid when:
-  - The transaction type is Payment
-  - The sender of the transaction is the algoDelegateAddress which is responsible for refunding
+  - The transaction type is Payment.
+  - The sender of the transaction is the algoDelegateAddress which is responsible for refunding.
   - The receiver of the transaction is the current address that is held in the asaOwnerAddress variable.
   - The payment amount is equal to the current highest bid that is held in the highestBid variable.
 - **Fourth transaction is valid** - the fourth transaction which is asset transfer from the ASADelegateAddress that transfers the ASA from the old owner to the new one is valid when:
-  - The transaction type is AssetTransfer
-  - The transaction sender is the ASADelegateAddress  which is responsible for transferring the ASA
+  - The transaction type is AssetTransfer.
+  - The transaction sender is the ASADelegateAddress  which is responsible for transferring the ASA.
   - The transaction receiver is the new owner address which is the sender of the first two transactions.
+- **Valid duration of time** - with this condition we are making sure that the current transaction's block is within the allowed interval of network's blocks specified at the initialization stage. 
 
 When all of the 4 transactions are valid we update the state of the application and thus the approval program returns that the atomic transfer is valid. If any of those cases fails the approval program will reject the atomic transfer transaction.
 
-The *ASA Delegate Authority* will make sure that we are transferring the correct ASA.
+#### Payment to the seller
+
+When the bidding period has ended, it means that the seller of the ASA has successfully sold the asset through bidding process. Now the final step is to transfer the money from the highest bid to the seller because during the bidding process they were lock inside a Smart Contract which is the ALGO Delegate Authority. The payment to the seller is happening to an Atomic Transfer with two transactions as described earlier. 
+
+```python
+def payment_to_seller_logic():
+    # Valid first transaction
+    end_round = App.globalGet(Bytes(AppVariables.appEndRound))
+    is_application_call = Gtxn[0].type_enum() == TxnType.ApplicationCall
+    bidding_period_has_ended = Global.round() > end_round
+
+    valid_first_transaction = And(is_application_call, bidding_period_has_ended)
+
+    # Valid second transaction
+    is_payment_call = Gtxn[1].type_enum() == TxnType.Payment
+
+    asa_seller_address = App.globalGet(Bytes(AppVariables.asaSellerAddress))
+    valid_receiver_of_algos = asa_seller_address == Gtxn[1].receiver()
+
+    highest_bid = App.globalGet(Bytes(AppVariables.highestBid))
+    valid_amount_of_algos = highest_bid == Gtxn[1].amount()
+
+    algo_delegate_authority = App.globalGet(Bytes(AppVariables.algoDelegateAddress))
+    valid_sender = algo_delegate_authority == Gtxn[1].sender()
+
+    valid_second_transaction = And(is_payment_call,
+                                   valid_receiver_of_algos,
+                                   valid_amount_of_algos,
+                                   valid_sender)
+
+    are_valid_transactions = And(valid_first_transaction,
+                                 valid_second_transaction)
+
+    return If(are_valid_transactions, Seq([Return(Int(1))]), Seq([Return(Int(0))]))
+```
+
+The logic of this code can be summarized in the following 2 conditions:
+
+- **First transaction is valid** - we make sure that the first transaction is a transaction of type ApplicationCall. Additionally we need to make sure that we are executing this transaction after the block number defined in the global variable *appEndRound*. With this we are making sure that the bidding period has ended.
+- **Second transaction is valid** - the second transaction is a payment transaction from the ALGO Delegate Authority to the *asaSellerAddress* defined in the global variables. We need to meet the following conditions:
+  - The transaction is of type Payment.
+  - The transaction's receiver is equal to the *asaSellerAddress* global variable.
+  - The amount of the transaction should be equal to the *highestBid* global variable.
+  - The sender of the transaction is the *algoDelegateAddress*. 
+
+When all of those conditions are met, our application should allow the payment to the seller to happen.
+
+#### Approval and clear programs
 
 In the end we combine everything to get the approval and the clear programs.
 
@@ -313,8 +370,9 @@ In the end we combine everything to get the approval and the clear programs.
 def approval_program():
     return application_start(initialization_code=app_initialization_logic(),
                              application_actions=
-                             setup_possible_app_calls_logic(assets_delegate_code=setup_asset_delegates_logic(),
-                                                            transfer_asa_logic=asa_transfer_logic()))
+                             setup_possible_app_calls_logic(asset_authorities_code=setup_asset_authorities_logic(),
+                                                            transfer_asa_code=asa_transfer_logic(),
+                                                            payment_to_seller_code=payment_to_seller_logic()))
 
 
 def clear_program():
@@ -323,7 +381,7 @@ def clear_program():
 
 ### ASA Delegate authority
 
-The *ASA Delegate Authority* is the Stateless Smart Contract that is responsible for transferring the ASA to the rightful owner. This contract logic is executed in the 4th transaction of the Atomic transfer. This authority needs to make sure that the right application is being called and the correct ASA token is being transferred. 
+The ASA Delegate Authority is the Stateless Smart Contract that is responsible for transferring the ASA to the rightful owner. This contract logic is executed in the 4th transaction of the Atomic transfer. This authority needs to make sure that the right application is being called and the correct ASA token is being transferred. 
 
 ```python
 def asa_delegate_authority_logic(app_id: int, asa_id: int):
@@ -346,22 +404,24 @@ After we compile this PyTeal code we will obtain a unique address that will repr
 
 ### Algo Delegate Authority
 
-The *Algo Delegate Authority* is the Stateless Smart Contract that is responsible for refunding ALGOs to the previous owner after change of ownership. This contract logic is executed in the 3rd transaction of the Atomic transfer. This authority needs to make sure that the right application is being called.
+The Algo Delegate Authority is the Stateless Smart Contract that is responsible for refunding ALGOs to the previous owner after change of ownership, receiving the ALGOs from the bidders and paying to the ASA seller address once the bidding period has ended. This contract can be executed in two types of Atomic Transfer transactions(*ASA Bidding and Payment to seller*) and that is why it needs to have different validation logic for each of those cases. Additionally, here we need to make sure that the right application is being called. 
 
 ```python
 def algo_delegate_authority_logic(app_id: int):
-    is_calling_right_app = Gtxn[0].application_id() == Int(app_id)
-    is_acceptable_fee = Gtxn[2].fee() <= Int(1000)
-    is_valid_close_to_address = Gtxn[2].asset_close_to() == Global.zero_address()
-    is_valid_rekey_to_address = Gtxn[2].rekey_to() == Global.zero_address()
+    is_bidding = Global.group_size() == Int(4)
 
-    return And(is_calling_right_app,
-               is_acceptable_fee,
-               is_valid_close_to_address,
-               is_valid_rekey_to_address)
+    return If(is_bidding,
+              And(Gtxn[0].application_id() == Int(app_id),
+                  Gtxn[2].fee() <= Int(1000),
+                  Gtxn[2].asset_close_to() == Global.zero_address(),
+                  Gtxn[2].rekey_to() == Global.zero_address()),
+              And(Gtxn[0].application_id() == Int(app_id),
+                  Gtxn[1].fee() <= Int(1000),
+                  Gtxn[1].asset_close_to() == Global.zero_address(),
+                  Gtxn[1].rekey_to() == Global.zero_address()))
 ```
 
-After we compile this PyTeal code we will obtain a unique address that will represent the **AlgoDelegateAddress** in our application for the provided **app_id**.
+After we have compiled this PyTeal code we will obtain a unique address that will represent the **AlgoDelegateAddress** in our application for the provided **app_id**.
 
 ## Application Services
 
@@ -369,23 +429,25 @@ The purpose of Application Services is to decouple the code of the application t
 
 ### Application Initialization Service
 
-This service is responsible for initialization of the application. After executing all of the required methods in this service we will end up with an application deployed on the TestNet that is ready to accept biddings for the ASA of interest.
+This service is responsible for initialization of the application. After executing all of the required methods in this service we will end up with an application that can easily be deployed on the TestNet that is ready to accept biddings for the ASA of interest.
 
 #### Initialization of the service
 
 ```python
 class AppInitializationService:
 
-    def __init__(self,
+        def __init__(self,
                  app_creator_pk: str,
                  app_creator_address: str,
                  asa_unit_name: str,
                  asa_asset_name: str,
-                 teal_version: int = 2):
+                 app_duration: int,
+                 teal_version: int = 3):
         self.app_creator_pk = app_creator_pk
         self.app_creator_address = app_creator_address
         self.asa_unit_name = asa_unit_name
         self.asa_asset_name = asa_asset_name
+        self.app_duration = app_duration
         self.teal_version = teal_version
 
         self.client = developer_credentials.get_client()
@@ -397,7 +459,8 @@ class AppInitializationService:
         self.asa_delegate_authority_address = ''
         self.algo_delegate_authority_address = ''
 ```
-In order to start the initialization of the service we must provide the app's creator private key and its public address. Additionally we must provide the unit name and the asset name in order to create the Algorand Standard Asset that will be interacted through this application. In the initialization of this service we retrieve the *Approval Program* and the *Clear Program* that were defined in the App Source Code section. We as well will initialize a client property which is an algod.AlgodClient object that enables us the interaction with the Algorand network.
+In order to start the initialization of the service we must provide the app's creator private key and its public address. Additionally we must provide the unit name and the asset name in order to create the Algorand Standard Asset that will be interacted through this application. We also define for how many rounds we want our application to accept bids.
+In the initialization of this service we retrieve the *Approval Program* and the *Clear Program* that were defined in the App Source Code section. We as well will initialize a client property which is an algod.AlgodClient object that enables us the interaction with the Algorand network.
 
 At the end we will have the correct values for the following properties: *app_id*, *asa_id*, *asa_delegate_authority_address* and *algo_delegate_authority_address*.
 
@@ -414,7 +477,7 @@ At the end we will have the correct values for the following properties: *app_id
 
         approval_program_bytes = blockchain_utils.compile_program(client=self.client,
                                                                   source_code=approval_program_compiled)
-        
+
         clear_program_bytes = blockchain_utils.compile_program(client=self.client,
                                                                source_code=clear_program_compiled)
 
@@ -433,11 +496,11 @@ At the end we will have the correct values for the following properties: *app_id
                                                           app_args=None)
 ```
 
-In this method call we compile the teal code created using the PyTeal sdk and submit an application transaction with the appropriate parameters. If this transaction succeed we have deployed our bidding application on the Algorand TestNet network.
+In this method call we compile the teal code created using the PyTeal sdk and submit an application transaction with the appropriate parameters. If this transaction succeeds, we have deployed our bidding application on the Algorand TestNet network.
 
 #### ASA Creation
 
-In this method we create the Algorand Standard Asset for which the users will bid through the application. We should note here that the we set the ASA to be frozen because we want the transferring of the ASA to be only through the *ASA Delegate Authority* address
+In this method we create the Algorand Standard Asset for which the users will bid through the application. We should note here that we set the ASA to be frozen because we want the transferring of the ASA to only happen through the *ASA Delegate Authority* address.
 
 ```python
     def create_asa(self):
@@ -457,7 +520,7 @@ In this method we create the Algorand Standard Asset for which the users will bi
 
 #### Setting up ASA Delegate Authority
 
-In this method we compile the PyTeal code used for the ASA Delegate Authority for the previously created **app_id** and **asa_id**. At the end we receive an asa_delegate_authority_address which represents a unique address that can act as any other address on the network. Note that if we compile the asa_delegate_authority_logic with different app_id or asa_id we will end up with different address.
+In this method we compile the PyTeal code used for the ASA Delegate Authority for the previously created **app_id** and **asa_id**. At the end we receive an *asa_delegate_authority_address* which represents a unique address that can act as any other address on the network. Note that if we compile the asa_delegate_authority_logic with different app_id or asa_id we will end up with different address.
 
 ```python
     def setup_asa_delegate_smart_contract(self):
@@ -474,7 +537,7 @@ In this method we compile the PyTeal code used for the ASA Delegate Authority fo
 ```
 #### Depositing fee funds to the ASA Delegate Authority
 
-Here we just deposit some ALGOs to the ASA Delegate Authority for transaction fees. Note that if the authority addresses run out of ALGO the application won't work because they would not be able to pay the fees to the Algorand Network.
+Here we just deposit some ALGOs to the ASA Delegate Authority for transaction fees. Note that if the authority addresses run out of ALGOs the application won't work because they would not be able to pay the fees to the Algorand Network.
 
 ```python
     def deposit_fee_funds_to_asa_delegate_authority(self):
@@ -501,7 +564,7 @@ After the first creation of the ASA we have set up the management credentials to
 
 #### Setting up Algo Delegate Authority
 
-In this method we compile the PyTeal code used for the Algo Delegate Authority for the previously created **app_id**. At the end we receive an algo_delegate_authority_address which represents a unique address that can act as any other address on the network. Note that if we compile the algo_delegate_authority_logic with different app_id we will end up with different address.
+In this method we compile the PyTeal code used for the Algo Delegate Authority for the previously created **app_id**. At the end we receive an *algo_delegate_authority_address* which represents a unique address that can act as any other address on the network. Note that if we compile the algo_delegate_authority_logic with different app_id we will end up with different address.
 
 ```python
     def setup_algo_delegate_smart_contract(self):
@@ -518,14 +581,16 @@ At the end we also deposit some ALGO funds to the *algo_delegate_authority_addre
 
 #### Setting up the delegate authorities in the application variables
 
-As we have described previously we need to call the application only once in order to set up the asaDelegateAddress, algoDelegateAddress and asaOwnerAddress global properties of the application. We pass those values as parameters to the application. When we pass the addresses as arguments we need to decode the 32 bytes string address into its address bytes and checksum.
+As we have described previously we need to call the application only once in order to set up the asaDelegateAddress, algoDelegateAddress, asaOwnerAddress, appEndRound and the asaSellerAddress global properties of the application. We pass those values as parameters to the application. When we pass the addresses as arguments we need to decode the 32 bytes string address into its address bytes and checksum.
 
 ```python
     def setup_app_delegates_authorities(self):
         app_args = [
             decode_address(self.asa_delegate_authority_address),
             decode_address(self.algo_delegate_authority_address),
-            decode_address(self.app_creator_address)
+            decode_address(self.app_creator_address),
+            self.app_duration,
+            decode_address(self.app_creator_address),
         ]
 
         blockchain_utils.call_application(client=self.client,
@@ -551,7 +616,7 @@ In order to initialize the interaction service we need to provide the *app_id* a
                  asa_id: int,
                  current_owner_address: str,
                  current_highest_bid: int = DefaultValues.highestBid,
-                 teal_version: int = 2):
+                 teal_version: int = 3):
         self.client = developer_credentials.get_client()
         self.app_id = app_id
         self.asa_id = asa_id
@@ -583,7 +648,7 @@ In order to initialize the interaction service we need to provide the *app_id* a
 
 #### Executing bidding call
 
-The bidding call consists of atomic transfer of 4 transactions that were described in more details in the previous sections. In order to execute a bidding we need to provide the bidder name which is sent as an argument in the first transaction, the bidder's private key and address and the bided amount for the asset. If the transactions are approved by the Stateful and the Stateless Smart Contracts a change of ownership of the ASA will happen.
+The bidding call consists of atomic transfer of 4 transactions that were described in more details in the previous sections. In order to execute a bidding we need to provide the bidder's private key, bidder's address and the bided amount for the asset. If the transactions are approved by the Stateful and the Stateless Smart Contracts a change of ownership of the ASA will happen.
 
 ```python
      def execute_bidding(self,
@@ -597,7 +662,6 @@ The bidding call consists of atomic transfer of 4 transactions that were describ
         bidding_app_call_txn = algo_txn.ApplicationCallTxn(sender=bidder_address,
                                                            sp=params,
                                                            index=self.app_id,
-                                                           app_args=[bidder_name],
                                                            on_complete=algo_txn.OnComplete.NoOpOC)
 
         # 2. Bidding payment transaction
@@ -657,6 +721,52 @@ The bidding call consists of atomic transfer of 4 transactions that were describ
         self.current_highest_bid = amount
 ```
 
+#### Payment to the seller
+
+This interaction allows us to pay the amount of the highest bid to the seller of the ASA. With this we complete the full cycle of the application, starting from creating the ASA, selling it through a bidding process and paying to the seller of the ASA. When we call this method we need to pass the address of the seller of the ASA and our Smart Contracts will make sure that we have passed the correct one.
+
+```python
+    def pay_to_seller(self, asa_seller_address):
+       
+        params = blockchain_utils.get_default_suggested_params(client=self.client)
+
+        # 1. Application call txn
+        bidding_app_call_txn = algo_txn.ApplicationCallTxn(sender=self.algo_delegate_authority_address,
+                                                           sp=params,
+                                                           index=self.app_id,
+                                                           on_complete=algo_txn.OnComplete.NoOpOC)
+
+        # 2. Payment transaction
+        algo_refund_txn = algo_txn.PaymentTxn(sender=self.algo_delegate_authority_address,
+                                              sp=params,
+                                              receiver=asa_seller_address,
+                                              amt=self.current_highest_bid)
+
+        # Atomic transfer
+        gid = algo_txn.calculate_group_id([bidding_app_call_txn,
+                                           algo_refund_txn])
+
+        bidding_app_call_txn.group = gid
+        algo_refund_txn.group = gid
+
+        bidding_app_call_txn_logic_signature = algo_txn.LogicSig(self.algo_delegate_authority_code_bytes)
+        bidding_app_call_txn_signed = algo_txn.LogicSigTransaction(bidding_app_call_txn,
+                                                                   bidding_app_call_txn_logic_signature)
+
+        algo_refund_txn_logic_signature = algo_txn.LogicSig(self.algo_delegate_authority_code_bytes)
+        algo_refund_txn_signed = algo_txn.LogicSigTransaction(algo_refund_txn, algo_refund_txn_logic_signature)
+
+        signed_group = [bidding_app_call_txn_signed,
+                        algo_refund_txn_signed]
+
+        txid = self.client.send_transactions(signed_group)
+
+        blockchain_utils.wait_for_confirmation(self.client, txid)
+
+```
+
+
+
 ## Application deployment on Algorand TestNet network
 
 The final thing that is left for us is to deploy and test the application on the network. 
@@ -670,6 +780,7 @@ app_initialization_service = AppInitializationService(app_creator_pk=main_dev_pk
                                                       app_creator_address=main_dev_address,
                                                       asa_unit_name="wawa",
                                                       asa_asset_name="wawa",
+                                                      app_duration=150,
                                                       teal_version=3)
 
 app_initialization_service.create_application()
@@ -688,15 +799,15 @@ app_initialization_service.setup_app_delegates_authorities()
 ```
 After executing this code we deploy and initialize the application on the TestNet. We can print the properties of the deployed app an inspect them on the [AlgoExplorer](https://testnet.algoexplorer.io/)
 ```python
-app_id: 17026927 
-asa_id: 17026938 
-asa_delegate_authority_address: U4R3SREIQFAVNCOMQITD4RWNH5LHCSO4BVAIWEJGNVVMLIYTHWXXPZ3Z5I 
-algo_delegate_authority_address: L3S72BCRBIY3V42GUNRERKDJ3ENIODBGJFAF53QJILJTBH5NTJQMYOZ6NU
+app_id: 18458985 
+asa_id: 18458996 
+asa_delegate_authority_address: 6UEWG6ROSP7FPZ5KGEXJUJDS6H4XJPMUYD5536DJGVZTDT3AIGR3XSWZEI 
+algo_delegate_authority_address: DLLSJRRJTSTLWEDISHHZVESGHOTGH6GXAWCKA4WLCB4ATDVHLUVIW3GGXQ
 ```
 
 If we inspect the global state of the application with id: 17026927 we see the following properties as expected:
 
-![Initialized app global state](https://github.com/Vilijan/ASABidding/blob/main/images/ApplicationGlobalState_AfterInitialization.png?raw=true)
+![App Global State](https://github.com/Vilijan/ASABidding/blob/main/images/ApplicationGlobalState_AfterInitialization.png?raw=true)
 
 We can also inspect the technical properties of the ASA with id: 17026938
 
@@ -714,14 +825,13 @@ app_interaction_service = AppInteractionService(app_id=app_initialization_servic
                                                 current_owner_address=main_dev_address,
                                                 teal_version=3)
 
-app_interaction_service.execute_bidding(bidder_name="Alice",
-                                        bidder_private_key=bidder_pk,
+app_interaction_service.execute_bidding(bidder_private_key=bidder_pk,
                                         bidder_address=bidder_address,
                                         amount=3000000)
 ```
 After the execution we get the following transaction id
 ```python
-Transaction TO55W6TK7IU7YG6FV6XECFFDGZQGKW5EQT5ECYGA4LFJICJMIJIA confirmed in round 14892176.
+Transaction RSHLMHVAI3QUJTC7HZSXPJ3GSJY56AJTAAE5C5QYJE7VF5QSFEMA confirmed in round 15196291.
 ```
 Since this transaction is an atomic transfer it has specific *group_id*. We inspect this *group_id* on the network as well and the application global state to see what has happened.
 
@@ -742,8 +852,7 @@ We can see that the state of the application has been changed as expected. The *
 We can execute second bidding with higher amount to test whether the ownership of the ASA will change.
 
 ```python
-app_interaction_service.execute_bidding(bidder_name="Bob",
-                                        bidder_private_key=main_dev_pk,
+app_interaction_service.execute_bidding(bidder_private_key=main_dev_pk,
                                         bidder_address=main_dev_address,
                                         amount=5000000)
 ```
@@ -751,7 +860,7 @@ app_interaction_service.execute_bidding(bidder_name="Bob",
 We get the following transaction id
 
 ```python
-Transaction IKI47OJU7XDZI6ATJJ75O44SM4DGWYWR6UDQQFAMM3JBIHBMVAAA confirmed in round 14892335.
+Transaction YNLQXFY4VTTECOMGUMJ2SYERTTWWH4QR3U3ENKZ5BH5H27RQVKTA confirmed in round 15196326.
 ```
 
 #### Atomic transfer overview
@@ -766,6 +875,24 @@ We can see that the ASA has been transferred to the new owner, the old ALGOs wer
 
 We can see that the application state has been updated accordingly to match the newest highest bid.
 
+### Payment to the seller
+
+After the bidding has ended, we can execute the payment to seller interaction with the following code:
+
+```python
+app_interaction_service.pay_to_seller(asa_seller_address=app_initialization_service.app_creator_address)
+```
+
+```python
+Transaction AP7QJWRAUV77UKSGAPNBVBO2NHGZFSSDJ6A3POBLYCIWMXL72DJA confirmed in round 15196420.
+```
+
+We can explore this transaction and see its properties.
+
+![Payment to Seller](https://github.com/Vilijan/ASABidding/blob/main/images/PaymentToSeller.png?raw=true)
+
+On the image above we can see that the *highestBid* of amount has been transferred to the seller of the ASA. With this we complete the full lifecycle of the ASA Bidding Application.
+
 ## Final thoughts
 
 If you have made it this far I want to sincerely thank you for reading this solution. I hope that you learned something new and interesting as it was the case for me. 
@@ -775,3 +902,4 @@ I strongly believe that we are just starting to scratch the surface of the usage
 ***This solution is intended for learning purposes only. It does not cover error checking and other edge cases therefore, should not be used as a production application.***
 
 I want to thanks [Cosimo Bassi](https://developer.algorand.org/u/cusma/) for making a tutorial on using smart contracts in the [Algo Realm Game](https://developer.algorand.org/solutions/algorealm-nft-royalty-game/) which inspired me to make this application.
+

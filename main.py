@@ -8,7 +8,7 @@ app_initialization_service = AppInitializationService(app_creator_pk=main_dev_pk
                                                       app_creator_address=main_dev_address,
                                                       asa_unit_name="wawa",
                                                       asa_asset_name="wawa",
-                                                      app_duration=50,
+                                                      app_duration=150,
                                                       teal_version=3)
 
 app_initialization_service.create_application()
@@ -45,8 +45,9 @@ app_interaction_service.execute_bidding(bidder_private_key=main_dev_pk,
                                         bidder_address=main_dev_address,
                                         amount=5000000)
 
-app_interaction_service.execute_bidding(bidder_private_key=bidder_pk,
-                                        bidder_address=bidder_address,
-                                        amount=5000005)
+# This should fail if we try to submit it after the bidding process has ended
+# app_interaction_service.execute_bidding(bidder_private_key=bidder_pk,
+#                                         bidder_address=bidder_address,
+#                                         amount=5000005)
 
 app_interaction_service.pay_to_seller(asa_seller_address=app_initialization_service.app_creator_address)
