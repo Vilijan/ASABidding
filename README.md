@@ -2,7 +2,7 @@
 
 ## Environment setup
 
-- `pip install requirements.txt`
+- `pip install -r requirements.txt`
 
 - Configure a `config.yml` file with the properties shown below:
 
@@ -19,6 +19,11 @@
     private_key: PRIVATE_KEY_VALUE
     public_key: PUBLIC_KEY_VALUE
   ```
+
+The private keys are expected to be base64 encoded.  You can use
+`python create-account.py` to create a new account and print the keys
+in the proper format.  You can fund these new accounts using the
+[Algorand TestNet Dispenser](https://bank.testnet.algorand.network/)
 
 ## Overview
 
